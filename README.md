@@ -390,7 +390,7 @@ python web_interface.py
 |--------|---------|---------|--------------|
 | OpenAI | `OPENAI_API_KEY` | GPT-4o / GPT-4o-mini | 是 |
 | Anthropic | `ANTHROPIC_API_KEY` | Claude Sonnet / Haiku | 是 |
-| 通义千问 | `DASHSCOPE_API_KEY` | qwen3-vl-plus / qwen3-max | 是（视觉） |
+| 通义千问 | `DASHSCOPE_API_KEY` | qwen3.6-plus | 是（视觉） | 推荐（本部分复现用的是这个）
 | MiniMax | `MINIMAX_API_KEY` | MiniMax-M2.7 | 否 |
 
 > Pattern Agent 和 Trend Agent 需要分析 K 线图片，因此必须使用支持视觉的模型。
@@ -400,7 +400,7 @@ python web_interface.py
 ## 常见问题
 
 ### Q: API Key 配置后报 403 错误？
-检查 Key 是否正确，以及账户余额是否充足。Qwen 服务端在新加坡，可能有网络延迟。
+检查 Key 是否正确，以及账户余额是否充足。
 
 ### Q: TA-Lib 安装失败？
 参考上面的 TA-Lib 安装说明，确保 C 库已安装。
