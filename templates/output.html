@@ -106,10 +106,10 @@
         
         .chart-caption {
             text-align: center;
-            margin-top: 0.5rem;
-            font-size: 0.9rem;
+            margin-top: 0.75rem;
+            font-size: 1.1rem;
             color: var(--gray-600);
-            font-style: italic;
+            font-weight: 500;
         }
          
          .panel {
@@ -320,6 +320,105 @@
             margin-top: 0.5rem;
         }
 
+        /* Trading Parameter Cards */
+        .trade-params-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .trade-param-card {
+            background: var(--white);
+            border-radius: 12px;
+            padding: 1.5rem 1rem;
+            text-align: center;
+            border: 2px solid var(--gray-200);
+            transition: all 0.3s ease;
+        }
+
+        .trade-param-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+        }
+
+        .trade-param-card.entry { border-color: #10B981; background: #ECFDF5; }
+        .trade-param-card.stop-loss { border-color: #EF4444; background: #FEF2F2; }
+        .trade-param-card.take-profit { border-color: #3B82F6; background: #EFF6FF; }
+        .trade-param-card.risk-reward { border-color: #F59E0B; background: #FFFBEB; }
+
+        .trade-param-label {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--gray-500);
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        .trade-param-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+        }
+
+        .trade-param-card.entry .trade-param-value { color: #059669; }
+        .trade-param-card.stop-loss .trade-param-value { color: #DC2626; }
+        .trade-param-card.take-profit .trade-param-value { color: #2563EB; }
+        .trade-param-card.risk-reward .trade-param-value { color: #D97706; }
+
+        .trade-param-empty {
+            color: var(--gray-400);
+            font-style: italic;
+            font-size: 1rem;
+        }
+
+        /* Technical Indicator Table */
+        .indicator-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+
+        .indicator-table th {
+            background: var(--gray-100);
+            padding: 0.75rem 1rem;
+            text-align: left;
+            font-weight: 600;
+            color: var(--gray-700);
+            border-bottom: 2px solid var(--gray-200);
+        }
+
+        .indicator-table td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--gray-100);
+            font-family: 'Courier New', monospace;
+            font-size: 0.95rem;
+        }
+
+        .indicator-table tr:hover {
+            background: var(--gray-50);
+        }
+
+        .indicator-latest {
+            font-weight: 700;
+            color: var(--etrade-purple);
+        }
+
+        .signal-bullish { color: #059669; font-weight: 600; }
+        .signal-bearish { color: #DC2626; font-weight: 600; }
+        .signal-neutral { color: #D97706; font-weight: 600; }
+
+        @media (max-width: 768px) {
+            .trade-params-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 0.75rem;
+            }
+
+            .trade-param-value {
+                font-size: 1.4rem;
+            }
+        }
+
         .analysis-card {
             background: var(--white);
             border-radius: 15px;
@@ -390,10 +489,7 @@
         .image-container {
             text-align: center;
             margin-top: 1rem;
-            padding: 1rem;
-            background: var(--white);
-            border-radius: 15px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            padding: 0.5rem;
         }
 
         .row { display: flex; flex-wrap: wrap; margin-left: -0.75rem; margin-right: -0.75rem; }
@@ -462,20 +558,20 @@
             <div class="text-center">
                 <!-- Centered Logo and Title -->
                 <div style="display: flex; align-items: center; justify-content: center; gap: 0rem; margin-bottom: 1rem;">
-                    <img src="/assets/darklogo.png" alt="QuantAgent Logo" style="width: 7rem; height: 7rem; object-fit: contain; background: transparent; box-shadow: none; border: none; border-radius: 0; transform: translateY(0.5rem);">
+                    <img src="/static/assets/darklogo.png" alt="QuantAgent Logo" style="width: 7rem; height: 7rem; object-fit: contain; background: transparent; box-shadow: none; border: none; border-radius: 0; transform: translateY(0.5rem);">
                     <span style="font-size: 4.0rem; font-weight: 700; color: white; line-height: 1.0;">QuantAgent</span>
                 </div>
                 <div class="text-center">
                     <!-- <h2 class="text-2xl font-semibold text-indigo-200 tracking-wide drop-shadow-sm">
-                        Analysis Results
+                        分析结果
                       </h2>
                        -->
                 </div>
                 
                 <!-- Back Button -->
                 <div style="margin-top: 2rem;">
-                    <a href="/demo" class="btn btn-outline-light" style="font-size: 1.3rem; padding: 0.75rem 1.5rem; border-radius: 12px;">
-                        <i class="fas fa-arrow-left"></i>&nbsp;&nbsp; Back to Demo
+                    <a href="/" class="btn btn-outline-light" style="font-size: 1.3rem; padding: 0.75rem 1.5rem; border-radius: 12px;">
+                        <i class="fas fa-arrow-left"></i>&nbsp;&nbsp; 返回首页
                     </a>
                 </div>
             </div>
@@ -487,7 +583,7 @@
              <div class="panel-group">
                                  <div class="panel">
                     <h4 class="panel-title">
-                        <i class="fas fa-chart-pie"></i> Analysis Summary
+                        <i class="fas fa-chart-pie"></i> 分析概要
                     </h4>
                      <div class="row align-items-stretch">
                          <div class="col-md-4 d-flex">
@@ -498,7 +594,7 @@
                          </div>
                          <div class="col-md-4 d-flex">
                              <div class="stats-card w-100">
-                                 <div class="stats-number">{{ results.timeframe if results.timeframe else '1h' }}</div>
+                                 <div class="stats-number">{{ results.timeframe if results.timeframe else '1d' }}</div>
                                  <div class="stats-label">Timeframe</div>
                              </div>
                          </div>
@@ -514,51 +610,142 @@
                  <!-- Final Decision Panel -->
                  <div class="panel">
                      <h4 class="panel-title">
-                         <i class="fas fa-bullseye"></i> Final Trading Decision
+                         <i class="fas fa-bullseye"></i> 最终交易决策
                      </h4>
                      <div class="text-center mb-3">
-                         {% if results.final_decision and results.final_decision.decision %}
-                             <span class="decision-badge decision-{{ results.final_decision.decision.lower() }}">{{ results.final_decision.decision }}</span>
+                         {% set decision = results.final_trade_decision %}
+                         {% set direction = results.decision_direction|default('') %}
+                         {% if decision and ('LONG' in (decision|upper) or '做多' in direction or '做多' in (decision|upper) or '做多' in decision) %}
+                             <span class="decision-badge decision-long">做多 (LONG)</span>
+                         {% elif decision and ('SHORT' in (decision|upper) or '做空' in direction or '做空' in (decision|upper) or '做空' in decision) %}
+                             <span class="decision-badge decision-short">做空 (SHORT)</span>
+                         {% elif decision %}
+                             <span class="decision-badge decision-long">待分析</span>
                          {% else %}
-                             <span class="decision-badge decision-long">LONG</span>
+                             <span class="decision-badge" style="background: linear-gradient(135deg, #6B7280 0%, #9CA3AF 100%); color: white;">暂无决策</span>
                          {% endif %}
                      </div>
-                     <div>
-                         {% if results.final_decision %}
-                             <p><strong>Forecast Horizon:</strong> {{ results.final_decision.forecast_horizon if results.final_decision.forecast_horizon else '24-48 hours' }}</p>
-                             <p><strong>Risk/Reward Ratio:</strong> {{ results.final_decision.risk_reward_ratio if results.final_decision.risk_reward_ratio else '1:2.5' }}</p>
-                             <p><strong>Justification:</strong></p>
-                             <p>{{ results.final_decision.justification if results.final_decision.justification else 'Based on comprehensive analysis of technical indicators, pattern recognition, and trend analysis, the system recommends a LONG position on BTC. The analysis shows strong bullish momentum with key support levels holding, and multiple technical indicators confirming upward movement.' }}</p>
-                         {% else %}
-                             <p><strong>Forecast Horizon:</strong> 24-48 hours</p>
-                             <p><strong>Risk/Reward Ratio:</strong> 1:2.5</p>
-                             <p><strong>Justification:</strong></p>
-                             <p>Based on comprehensive analysis of technical indicators, pattern recognition, and trend analysis, the system recommends a LONG position on BTC. The analysis shows strong bullish momentum with key support levels holding, and multiple technical indicators confirming upward movement.</p>
-                         {% endif %}
+                     {% if decision %}
+                     <div class="auto-beautify" data-field="final_trade_decision">
+                         <pre style="background: var(--gray-50); padding: 1.5rem; border-radius: 8px; overflow-x: auto; font-family: 'Courier New', monospace; font-size: 1rem; line-height: 1.6; color: var(--gray-700); border: 1px solid var(--gray-200); white-space: pre-wrap; word-wrap: break-word;">{{ decision | safe }}</pre>
                      </div>
+                     {% else %}
+                     <p class="text-center text-muted">暂无交易决策，请先运行分析</p>
+                     {% endif %}
                  </div>
-                 
+
+                 <!-- Trading Parameter Cards -->
+                 <div class="panel">
+                     <h4 class="panel-title">
+                         <i class="fas fa-exchange-alt"></i> 交易参数
+                     </h4>
+                     {% set entry_price = results.entry_price %}
+                     {% set stop_loss = results.stop_loss %}
+                     {% set take_profit = results.take_profit %}
+                     {% if entry_price or stop_loss or take_profit %}
+                     <div class="trade-params-grid">
+                         <div class="trade-param-card entry">
+                             <div class="trade-param-label">入场价格</div>
+                             {% if entry_price %}
+                                 <div class="trade-param-value">{{ "%.2f"|format(entry_price|float) }}</div>
+                             {% else %}
+                                 <div class="trade-param-empty">—</div>
+                             {% endif %}
+                         </div>
+                         <div class="trade-param-card stop-loss">
+                             <div class="trade-param-label">止损价格</div>
+                             {% if stop_loss %}
+                                 <div class="trade-param-value">{{ "%.2f"|format(stop_loss|float) }}</div>
+                             {% else %}
+                                 <div class="trade-param-empty">—</div>
+                             {% endif %}
+                         </div>
+                         <div class="trade-param-card take-profit">
+                             <div class="trade-param-label">止盈价格</div>
+                             {% if take_profit %}
+                                 <div class="trade-param-value">{{ "%.2f"|format(take_profit|float) }}</div>
+                             {% else %}
+                                 <div class="trade-param-empty">—</div>
+                             {% endif %}
+                         </div>
+                         <div class="trade-param-card risk-reward">
+                             <div class="trade-param-label">风险收益比</div>
+                             {% if entry_price and stop_loss and take_profit and (entry_price|float - stop_loss|float) != 0 %}
+                                 {% set rr = ((take_profit|float - entry_price|float) / (entry_price|float - stop_loss|float))|abs %}
+                                 <div class="trade-param-value">{{ "%.2f"|format(rr) }}</div>
+                             {% else %}
+                                 <div class="trade-param-empty">—</div>
+                             {% endif %}
+                         </div>
+                     </div>
+                     {% else %}
+                     <p class="text-center text-muted">系统未提供具体交易参数，请参考上方交易决策和下方技术指标分析</p>
+                     {% endif %}
+                 </div>
+
                                  <!-- Technical Indicators Panel -->
                 <div class="large-panel">
                     <h3 class="large-panel-title">
-                        <i class="fas fa-chart-bar"></i> Indicator Agent
+                        <i class="fas fa-chart-bar"></i> 技术指标分析
                     </h3>
                     <div class="large-panel-section">
-                        {% if results.technical_indicators %}
-                            <div class="auto-beautify">{{ results.technical_indicators | safe }}</div>
+                        {% if results.indicator_report %}
+                            <div class="auto-beautify">{{ results.indicator_report | safe }}</div>
                         {% else %}
-                            <div class="auto-beautify">
-                                <ul>
-                                    <li><strong>RSI (14):</strong> 65.4 - Neutral to bullish momentum</li>
-                                    <li><strong>MACD:</strong> Bullish crossover with increasing histogram</li>
-                                    <li><strong>Moving Averages:</strong> Price above 50-day and 200-day MA</li>
-                                    <li><strong>Bollinger Bands:</strong> Price in upper band, showing strength</li>
-                                    <li><strong>Volume:</strong> Above average volume supporting price action</li>
-                                </ul>
-                            </div>
+                            <p>等待运行分析获取技术指标报告...</p>
                         {% endif %}
                     </div>
                 </div>
+
+                 <!-- Technical Indicator Values -->
+                <div class="large-panel">
+                    <h3 class="large-panel-title">
+                        <i class="fas fa-table"></i> 技术指标数值
+                    </h3>
+                    {% set indicators = results.get('indicators', {}) if results else {} %}
+                    {% if indicators %}
+                    <table class="indicator-table">
+                        <thead>
+                            <tr>
+                                <th>指标</th>
+                                <th>最新值</th>
+                                <th>信号</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for name, key, signal_fn in [
+                                ('RSI (14)', 'rsi', None),
+                                ('MACD', 'macd', None),
+                                ('MACD 信号线', 'macd_signal', None),
+                                ('MACD 柱状图', 'macd_hist', None),
+                                ('随机指标 %K', 'stoch_k', None),
+                                ('随机指标 %D', 'stoch_d', None),
+                                ('变化率 ROC', 'roc', None),
+                                ('威廉指标 %R', 'willr', None),
+                            ] %}
+                            {% set values = indicators.get(key) %}
+                            {% if values and values|length > 0 %}
+                            <tr>
+                                <td><strong>{{ name }}</strong></td>
+                                <td class="indicator-latest">
+                                    {% if values|length > 1 %}
+                                    {{ "%.4f"|format(values[-1]|float) }}
+                                    <span class="text-muted" style="font-size: 0.8em;">(共{{ values|length }}条)</span>
+                                    {% else %}
+                                    {{ "%.4f"|format(values[0]|float) }}
+                                    {% endif %}
+                                </td>
+                                <td id="signal-{{ key }}" class="signal-cell">—</td>
+                            </tr>
+                            {% endif %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <p class="text-center text-muted">等待运行分析获取技术指标数据...</p>
+                    {% endif %}
+                </div>
+
              </div>
             
 
@@ -566,46 +753,45 @@
                                      <!-- Pattern Agent: Pattern Recognition + Pattern Visualization -->
             <div class="large-panel">
                 <h3 class="large-panel-title">
-                    <i class="fas fa-brain"></i> Pattern Agent
+                    <i class="fas fa-brain"></i> K线形态识别
                 </h3>
                 <div style="display: flex; gap: 2rem; margin-top: 1rem;">
                     <!-- Left Panel: Pattern Recognition -->
                     <div class="panel" style="flex: 1;">
                         <h4 class="panel-title">
-                            <i class="fas fa-search"></i> Pattern Recognition
+                            <i class="fas fa-search"></i> 形态识别结果
                         </h4>
                         <div class="form-group">
-                            <h5>Identified Pattern:</h5>
-                            {% if results.pattern_analysis %}
-                                <div class="auto-beautify">{{ results.pattern_analysis | safe }}</div>
+                            <h5>识别形态:</h5>
+                            {% if results.pattern_report %}
+                                <div class="auto-beautify">{{ results.pattern_report | safe }}</div>
                             {% else %}
-                                <ul>
-                                    <li><strong>Descending Triangle:</strong> Lower highs with flat support</li>
-                                    <li><strong>Structure:</strong> Converging trend lines</li>
-                                    <li><strong>Trend:</strong> Prior downtrend continuation</li>
-                                    <li><strong>Symmetry:</strong> Consistent pattern formation</li>
-                                </ul>
+                                <p>等待运行分析获取形态识别结果...</p>
                             {% endif %}
                         </div>
                         
                         <div class="form-group">
-                            <h5>Pattern Reliability:</h5>
-                            <p>Descending triangle has a high success rate for bearish continuation patterns. Key support level at 110,000.</p>
+                            <h5>形态可靠性:</h5>
+                            {% if results.pattern_report %}
+                                <p>详见上方形态识别结果分析。</p>
+                            {% else %}
+                                <p>等待运行分析...</p>
+                            {% endif %}
                         </div>
                     </div>
                     
                     <!-- Right Panel: Pattern Visualization -->
                     <div class="panel" style="flex: 1;">
                         <h4 class="panel-title">
-                            <i class="fas fa-chart-bar"></i> Pattern Visualization
+                            <i class="fas fa-chart-bar"></i> K线图表
                         </h4>
                         <div class="image-container">
                             {% if results.pattern_chart %}
-                                <img src="data:image/png;base64,{{ results.pattern_chart }}" alt="Pattern Analysis Chart" class="analysis-image">
+                                <img src="data:image/png;base64,{{ results.pattern_chart }}" alt="K线形态分析图" class="analysis-image">
                             {% else %}
-                                <img src="/api/images/pattern" alt="Pattern Analysis Chart" class="analysis-image">
+                                <img src="/api/images/pattern" alt="K线形态分析图" class="analysis-image">
                             {% endif %}
-                            <p class="chart-caption">Desc Triangle Overlay</p>
+                            <p class="chart-caption">K 线形态</p>
                         </div>
                     </div>
                 </div>
@@ -614,41 +800,36 @@
                          <!-- Trend Agent: Trend Analysis + Trend Chart -->
             <div class="large-panel">
                 <h3 class="large-panel-title">
-                    <i class="fas fa-chart-line"></i> Trend Agent
+                    <i class="fas fa-chart-line"></i> 趋势分析
                 </h3>
                 <div class="large-panel-content">
-                    <div class="panel-group-2">
-                        <div class="panel">
+                    <div style="display: flex; gap: 2rem; margin-top: 1rem;">
+                        <!-- Left Panel: Trend Analysis -->
+                        <div class="panel" style="flex: 1;">
                             <h4 class="panel-title">
-                                <i class="fas fa-analytics"></i> Trend Analysis
+                                <i class="fas fa-analytics"></i> 趋势分析结果
                             </h4>
                             <div class="form-group">
-                                <h5>Trend Strength Indicators:</h5>
-                                <ul>
-                                    <li><strong>ADX:</strong> 28.5 - Moderate trend strength</li>
-                                    <li><strong>RSI Divergence:</strong> Positive divergence detected</li>
-                                    <li><strong>Momentum:</strong> Declining momentum indicators</li>
-                                    <li><strong>Volume:</strong> Decreasing volume on rallies</li>
-                                </ul>
-                            </div>
-                            
-                            <div class="form-group">
-                                <h5>Likely Downtrend Signal:</h5>
-                                <p>Consistent downward slope and inability to break resistance suggest continued bearish pressure. Short-term trend likely to continue downward.</p>
+                                {% if results.trend_report %}
+                                    <div class="auto-beautify">{{ results.trend_report | safe }}</div>
+                                {% else %}
+                                    <p>等待运行分析获取趋势分析结果...</p>
+                                {% endif %}
                             </div>
                         </div>
-                        
-                        <div class="panel">
+
+                        <!-- Right Panel: Trend Chart -->
+                        <div class="panel" style="flex: 1;">
                             <h4 class="panel-title">
-                                <i class="fas fa-chart-line"></i> Trend Visualization
+                                <i class="fas fa-chart-area"></i> 趋势图表
                             </h4>
                             <div class="image-container">
                                 {% if results.trend_chart %}
-                                    <img src="data:image/png;base64,{{ results.trend_chart }}" alt="Trend Analysis Chart" class="analysis-image">
+                                    <img src="data:image/png;base64,{{ results.trend_chart }}" alt="趋势分析图" class="analysis-image">
                                 {% else %}
-                                    <img src="/api/images/trend" alt="Trend Analysis Chart" class="analysis-image">
+                                    <img src="/api/images/trend" alt="趋势分析图" class="analysis-image">
                                 {% endif %}
-                                <p class="chart-caption">Support & Resistance Lines</p>
+                                <p class="chart-caption">支撑位与阻力位</p>
                             </div>
                         </div>
                     </div>
@@ -662,36 +843,243 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script>
-        // Check for full results in sessionStorage and update page
+        // Helper: find the .large-panel that contains an icon matching the given class
+        function findLargePanelByIcon(iconClass) {
+            const icon = document.querySelector('.' + iconClass);
+            if (!icon) return null;
+            return icon.closest('.large-panel');
+        }
+
+        // Helper: find a .panel whose .panel-title contains an icon matching the given class
+        function findSubPanelByIcon(parentEl, iconClass) {
+            const icon = parentEl.querySelector('.' + iconClass);
+            if (!icon) return null;
+            return icon.closest('.panel');
+        }
+
+        // Render analysis results from sessionStorage
         document.addEventListener('DOMContentLoaded', function() {
-            // Check if we have full results with images in sessionStorage
-            const fullResults = sessionStorage.getItem('analysisResults');
-            if (fullResults) {
-                try {
-                    const results = JSON.parse(fullResults);
-                    
-                    // Update pattern chart if available
-                    if (results.pattern_chart) {
-                        const patternImg = document.querySelector('img[alt="Pattern Analysis Chart"]');
-                        if (patternImg) {
-                            patternImg.src = `data:image/png;base64,${results.pattern_chart}`;
-                        }
+            const raw = sessionStorage.getItem('analysisResults');
+            if (!raw) return;
+
+            let r;
+            try { r = JSON.parse(raw); } catch (e) {
+                console.error('Failed to parse analysisResults:', e);
+                return;
+            }
+
+            console.log('Rendering analysis results from sessionStorage:', r);
+
+            // --- Stats cards ---
+            const stats = document.querySelectorAll('.stats-number');
+            if (r.data_length && stats[0]) stats[0].textContent = r.data_length;
+            if (r.timeframe && stats[1]) stats[1].textContent = r.timeframe;
+            if (r.asset_name && stats[2]) stats[2].textContent = r.asset_name;
+
+            // --- Final trade decision ---
+            if (r.final_trade_decision) {
+                const decisionPanel = document.querySelector('.panel-title i.fa-bullseye')?.closest('.panel');
+                if (decisionPanel) {
+                    const autoDiv = decisionPanel.querySelector('.auto-beautify');
+                    if (autoDiv) autoDiv.innerHTML = '<div style="white-space:pre-wrap;">' + r.final_trade_decision.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>';
+                    // Hide waiting text if exists
+                    const waitP = decisionPanel.querySelector('p.text-muted');
+                    if (waitP) waitP.style.display = 'none';
+                }
+                const badge = document.querySelector('.decision-badge');
+                if (badge) {
+                    const upper = r.final_trade_decision.toUpperCase();
+                    const dir = (r.decision_direction || '').toUpperCase();
+                    if (upper.includes('LONG') || upper.includes('做多') || dir.includes('做多')) {
+                        badge.className = 'decision-badge decision-long';
+                        badge.textContent = '做多 (LONG)';
+                    } else if (upper.includes('SHORT') || upper.includes('做空') || dir.includes('做空')) {
+                        badge.className = 'decision-badge decision-short';
+                        badge.textContent = '做空 (SHORT)';
+                    } else {
+                        badge.className = 'decision-badge';
+                        badge.style.background = 'linear-gradient(135deg, #6B7280 0%, #9CA3AF 100%)';
+                        badge.style.color = 'white';
+                        badge.textContent = '暂无明确方向';
                     }
-                    
-                    // Update trend chart if available
-                    if (results.trend_chart) {
-                        const trendImg = document.querySelector('img[alt="Trend Analysis Chart"]');
-                        if (trendImg) {
-                            trendImg.src = `data:image/png;base64,${results.trend_chart}`;
-                        }
+                }
+            } else if (r.decision_direction) {
+                // Only direction available but no final_trade_decision
+                const badge = document.querySelector('.decision-badge');
+                if (badge) {
+                    const dir = r.decision_direction.toUpperCase();
+                    if (dir.includes('做多') || dir.includes('LONG')) {
+                        badge.className = 'decision-badge decision-long';
+                        badge.textContent = '做多 (LONG)';
+                    } else if (dir.includes('做空') || dir.includes('SHORT')) {
+                        badge.className = 'decision-badge decision-short';
+                        badge.textContent = '做空 (SHORT)';
                     }
-                    
-                    // Clear sessionStorage after using the results
-                    sessionStorage.removeItem('analysisResults');
-                } catch (e) {
-                    console.error('Error parsing sessionStorage results:', e);
                 }
             }
+
+            // --- Trade parameter cards ---
+            const hasAnyParam = r.entry_price || r.stop_loss || r.take_profit;
+            if (hasAnyParam) {
+                const paramPanel = document.querySelector('.panel-title i.fa-exchange-alt')?.closest('.panel');
+                if (paramPanel) {
+                    const waitP = paramPanel.querySelector('p.text-muted, p.text-center');
+                    if (waitP) waitP.remove();
+                    if (!paramPanel.querySelector('.trade-params-grid')) {
+                        paramPanel.insertAdjacentHTML('beforeend', '<div class="trade-params-grid"></div>');
+                    }
+                }
+
+                function setParamValue(selector, value) {
+                    const el = document.querySelector(selector);
+                    if (el && value !== null && value !== undefined && value !== '') {
+                        el.textContent = parseFloat(value).toFixed(2);
+                        const emptyEl = el.closest('.trade-param-card').querySelector('.trade-param-empty');
+                        if (emptyEl) emptyEl.style.display = 'none';
+                    }
+                }
+                setParamValue('.trade-param-card.entry .trade-param-value', r.entry_price);
+                setParamValue('.trade-param-card.stop-loss .trade-param-value', r.stop_loss);
+                setParamValue('.trade-param-card.take-profit .trade-param-value', r.take_profit);
+
+                if (r.entry_price && r.stop_loss && r.take_profit) {
+                    const entry = parseFloat(r.entry_price);
+                    const sl = parseFloat(r.stop_loss);
+                    const tp = parseFloat(r.take_profit);
+                    if (entry !== sl) {
+                        const rrCard = document.querySelector('.trade-param-card.risk-reward .trade-param-value');
+                        if (rrCard) {
+                            rrCard.textContent = Math.abs((tp - entry) / (entry - sl)).toFixed(2);
+                            const emptyEl = rrCard.closest('.trade-param-card').querySelector('.trade-param-empty');
+                            if (emptyEl) emptyEl.style.display = 'none';
+                        }
+                    }
+                }
+            }
+
+            // --- Indicator report (技术指标分析) ---
+            if (r.indicator_report) {
+                const indicatorPanel = findLargePanelByIcon('fa-chart-bar');
+                if (indicatorPanel) {
+                    const section = indicatorPanel.querySelector('.large-panel-section');
+                    if (section) {
+                        section.innerHTML = '<div class="auto-beautify">' + r.indicator_report + '</div>';
+                    }
+                }
+            }
+
+            // --- Indicator values table (技术指标数值) ---
+            if (r.indicators && typeof r.indicators === 'object') {
+                const hasAnyIndicator = Object.values(r.indicators).some(function(v) {
+                    return Array.isArray(v) && v.length > 0;
+                });
+                if (hasAnyIndicator) {
+                    const tablePanel = findLargePanelByIcon('fa-table');
+                    if (tablePanel) {
+                        // Remove "waiting" paragraph
+                        const waitP = tablePanel.querySelector('p.text-muted, p.text-center');
+                        if (waitP) waitP.remove();
+                        // Remove existing table if any
+                        const existingTable = tablePanel.querySelector('.indicator-table');
+                        if (existingTable) existingTable.remove();
+
+                        // Build table
+                        const indNames = [
+                            ['rsi', 'RSI (14)'], ['macd', 'MACD'], ['macd_signal', 'MACD 信号线'],
+                            ['macd_hist', 'MACD 柱状图'], ['stoch_k', '随机指标 %K'],
+                            ['stoch_d', '随机指标 %D'], ['roc', '变化率 ROC'], ['willr', '威廉指标 %R']
+                        ];
+                        const rows = [];
+                        for (const [key, name] of indNames) {
+                            const vals = r.indicators[key];
+                            if (vals && Array.isArray(vals) && vals.length > 0) {
+                                const latest = parseFloat(vals[vals.length - 1]).toFixed(4);
+                                const count = vals.length > 1
+                                    ? '<span class="text-muted" style="font-size:0.8em;"> (共' + vals.length + '条)</span>'
+                                    : '';
+                                rows.push(
+                                    '<tr><td><strong>' + name + '</strong></td>' +
+                                    '<td class="indicator-latest">' + latest + count + '</td>' +
+                                    '<td class="signal-cell indicator-latest">' + latest + '</td></tr>'
+                                );
+                            }
+                        }
+                        if (rows.length > 0) {
+                            const tableHtml = '<table class="indicator-table">' +
+                                '<thead><tr><th>指标</th><th>最新值</th><th>信号</th></tr></thead>' +
+                                '<tbody>' + rows.join('') + '</tbody></table>';
+                            tablePanel.insertAdjacentHTML('beforeend', tableHtml);
+                        }
+                    }
+                }
+            }
+
+            // --- Pattern report + chart (K线形态识别) ---
+            if (r.pattern_report) {
+                const patternPanel = findLargePanelByIcon('fa-brain');
+                if (patternPanel) {
+                    // Find the left sub-panel (识别形态) by the fa-search icon
+                    const leftPanel = patternPanel.querySelector('.panel-title i.fa-search')?.closest('.panel');
+                    if (leftPanel) {
+                        const decoded = r.pattern_report
+                            .replace(/&lt;/g, '<')
+                            .replace(/&gt;/g, '>')
+                            .replace(/&amp;/g, '&')
+                            .replace(/&#39;/g, "'")
+                            .replace(/&quot;/g, '"');
+                        // Replace all form-groups inside left panel
+                        leftPanel.innerHTML =
+                            '<h4 class="panel-title"><i class="fas fa-search"></i> 形态识别结果</h4>' +
+                            '<div class="form-group">' +
+                                '<h5>识别形态:</h5>' +
+                                '<div class="auto-beautify">' + decoded + '</div>' +
+                            '</div>' +
+                            '<div class="form-group">' +
+                                '<h5>形态可靠性:</h5>' +
+                                '<p>详见上方形态识别结果分析。</p>' +
+                            '</div>';
+                    }
+                }
+            }
+            if (r.pattern_chart) {
+                const img = document.querySelector('img[alt="K线形态分析图"]');
+                if (img) img.src = 'data:image/png;base64,' + r.pattern_chart;
+            }
+
+            // --- Trend report + chart (趋势分析) ---
+            if (r.trend_report) {
+                const trendPanel = findLargePanelByIcon('fa-chart-line');
+                if (trendPanel) {
+                    // Find the left sub-panel (趋势分析结果) by the fa-analytics icon
+                    const leftPanel = trendPanel.querySelector('.panel-title i.fa-analytics')?.closest('.panel');
+                    if (leftPanel) {
+                        const fg = leftPanel.querySelector('.form-group');
+                        if (fg) {
+                            // Decode HTML entities before setting innerHTML
+                            const decoded = r.trend_report
+                                .replace(/&lt;/g, '<')
+                                .replace(/&gt;/g, '>')
+                                .replace(/&amp;/g, '&')
+                                .replace(/&#39;/g, "'")
+                                .replace(/&quot;/g, '"');
+                            // If content contains markdown patterns, convert first
+                            let html = decoded;
+                            if (decoded.includes('**') || decoded.includes('* ') || decoded.startsWith('###')) {
+                                html = marked.parse(decoded);
+                            }
+                            fg.innerHTML = '<div class="auto-beautify">' + html + '</div>';
+                        }
+                    }
+                }
+            }
+            if (r.trend_chart) {
+                const img = document.querySelector('img[alt="趋势分析图"]');
+                if (img) img.src = 'data:image/png;base64,' + r.trend_chart;
+            }
+
+            // Done — clear sessionStorage
+            sessionStorage.removeItem('analysisResults');
+            console.log('Analysis results rendered successfully');
         });
         
         // Convert markdown to HTML and beautify content when page loads

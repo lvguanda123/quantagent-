@@ -45,10 +45,12 @@ class TradingGraph:
 
         # --- Graph logic and setup ---
         self.graph_setup = SetGraph(
-            self.agent_llm,
-            self.graph_llm,
-            self.toolkit,
-            # self.tool_nodes,
+            agent_llm=self.agent_llm,       # Indicator Agent
+            pattern_llm=self.graph_llm,    # Pattern Agent (uses vision model)
+            trend_llm=self.graph_llm,      # Trend Agent (uses vision model)
+            decision_llm=self.agent_llm,    # Decision Agent (uses text model)
+            toolkit=self.toolkit,
+            # tool_nodes=self.tool_nodes,
         )
 
         # --- The main LangGraph graph object ---
@@ -188,6 +190,7 @@ class TradingGraph:
                 model=model,
                 temperature=temperature,
                 api_key=api_key,
+                base_url=self.config.get("base_url"),
             )
         elif provider == "qwen":
             return ChatQwen(
@@ -250,10 +253,12 @@ class TradingGraph:
 
         # Recreate the graph setup with new LLMs
         self.graph_setup = SetGraph(
-            self.agent_llm,
-            self.graph_llm,
-            self.toolkit,
-            # self.tool_nodes,
+            agent_llm=self.agent_llm,       # Indicator Agent
+            pattern_llm=self.graph_llm,    # Pattern Agent (uses vision model)
+            trend_llm=self.graph_llm,      # Trend Agent (uses vision model)
+            decision_llm=self.agent_llm,    # Decision Agent (uses text model)
+            toolkit=self.toolkit,
+            # tool_nodes=self.tool_nodes,
         )
 
         # Recreate the main graph

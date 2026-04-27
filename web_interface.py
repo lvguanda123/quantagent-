@@ -1,1083 +1,754 @@
+"""
+Web Interface for QuantAgent Trading Analysis.
+Supports AKShare: A-shares, funds, ETF minute data.
+"""
+
 import json
 import os
 import re
+import requests
 import urllib.parse
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict
 
 import pandas as pd
-import yfinance as yf
-from flask import Flask, jsonify, render_template, request, send_file
-from openai import OpenAI
+from flask import Flask, jsonify, render_template, request, send_from_directory
 
 import static_util
 from trading_graph import TradingGraph
 
-app = Flask(__name__)
+# AKShare
+try:
+    import akshare as ak
+    AKSHARE_AVAILABLE = True
+except ImportError:
+    AKSHARE_AVAILABLE = False
+    print("Warning: AKShare not available")
+
+app = Flask(__name__, static_folder="static", static_url_path="/static")
 
 
 class WebTradingAnalyzer:
     def __init__(self):
-        """Initialize the web trading analyzer."""
         from default_config import DEFAULT_CONFIG
-        # Start with default config (OpenAI)
         self.config = DEFAULT_CONFIG.copy()
         self.trading_graph = TradingGraph(config=self.config)
-        self.data_dir = Path("data")
 
-        # Ensure data dir exists
-        self.data_dir.mkdir(parents=True, exist_ok=True)
-
-        # Available assets and their display names
-        self.asset_mapping = {
-            "SPX": "S&P 500",
-            "BTC": "Bitcoin",
-            "GC": "Gold Futures",
-            "NQ": "Nasdaq Futures",
-            "CL": "Crude Oil",
-            "ES": "E-mini S&P 500",
-            "DJI": "Dow Jones",
-            "QQQ": "Invesco QQQ Trust",
-            "VIX": "Volatility Index",
-            "DXY": "US Dollar Index",
-            "AAPL": "Apple Inc.",  # New asset
-            "TSLA": "Tesla Inc.",  # New asset
-        }
-
-        # Yahoo Finance symbol mapping
-        self.yfinance_symbols = {
-            "SPX": "^GSPC",  # S&P 500
-            "BTC": "BTC-USD",  # Bitcoin
-            "GC": "GC=F",  # Gold Futures
-            "NQ": "NQ=F",  # Nasdaq Futures
-            "CL": "CL=F",  # Crude Oil
-            "ES": "ES=F",  # E-mini S&P 500
-            "DJI": "^DJI",  # Dow Jones
-            "QQQ": "QQQ",  # Invesco QQQ Trust
-            "VIX": "^VIX",  # Volatility Index
-            "DXY": "DX-Y.NYB",  # US Dollar Index
-        }
-
-        # Yahoo Finance interval mapping
-        self.yfinance_intervals = {
-            "1m": "1m",
-            "5m": "5m",
-            "15m": "15m",
-            "30m": "30m",
-            "1h": "1h",
-            "4h": "4h",  # yfinance supports 4h natively!
-            "1d": "1d",
-            "1w": "1wk",
-            "1mo": "1mo",
-        }
-
-        # Load persisted custom assets
-        self.custom_assets_file = self.data_dir / "custom_assets.json"
-        self.custom_assets = self.load_custom_assets()
-
-    def fetch_yfinance_data(
-        self, symbol: str, interval: str, start_date: str, end_date: str
+    def fetch_akshare_stock_data(
+        self, symbol: str, start_date: str, end_date: str
     ) -> pd.DataFrame:
-        """Fetch OHLCV data from Yahoo Finance."""
-        try:
-            yf_symbol = self.yfinance_symbols.get(symbol, symbol)
-            yf_interval = self.yfinance_intervals.get(interval, interval)
+        """Fetch A-share stock daily data via stock_zh_a_hist (东方财富)."""
+        if not AKSHARE_AVAILABLE:
+            return pd.DataFrame()
 
-            df = yf.download(
-                tickers=yf_symbol, start=start_date, end=end_date, interval=yf_interval
+        try:
+            # stock_zh_a_hist uses pure 6-digit code
+            clean_symbol = symbol.replace("sz", "").replace("SZ", "").replace("sh", "").replace("SH", "")
+
+            df = ak.stock_zh_a_hist(
+                symbol=clean_symbol,
+                period="daily",
+                start_date=start_date.replace("-", ""),
+                end_date=end_date.replace("-", ""),
+                adjust="qfq"
             )
 
             if df is None or df.empty:
                 return pd.DataFrame()
 
-            # Ensure df is a DataFrame, not a Series
-            if isinstance(df, pd.Series):
-                df = df.to_frame()
+            # Standardize columns
+            df = df.rename(columns={
+                "日期": "Datetime",
+                "开盘": "Open",
+                "最高": "High",
+                "最低": "Low",
+                "收盘": "Close",
+                "成交量": "Volume"
+            })
 
-            # Reset index to ensure we have a clean DataFrame
-            df = df.reset_index()
-
-            # Ensure we have a DataFrame
-            if not isinstance(df, pd.DataFrame):
+            required = ["Datetime", "Open", "High", "Low", "Close", "Volume"]
+            if not all(c in df.columns for c in required):
+                print(f"Missing columns: {df.columns.tolist()}")
                 return pd.DataFrame()
 
-            # Handle potential MultiIndex columns
-            if isinstance(df.columns, pd.MultiIndex):
-                df.columns = df.columns.get_level_values(0)
-
-            # Rename columns if needed
-            column_mapping = {
-                "Date": "Datetime",
-                "Open": "Open",
-                "High": "High",
-                "Low": "Low",
-                "Close": "Close",
-                "Volume": "Volume",
-            }
-
-            # Only rename columns that exist
-            existing_columns = {
-                old: new for old, new in column_mapping.items() if old in df.columns
-            }
-            df = df.rename(columns=existing_columns)
-
-            # Ensure we have the required columns
-            required_columns = ["Datetime", "Open", "High", "Low", "Close"]
-            if not all(col in df.columns for col in required_columns):
-                print(f"Warning: Missing columns. Available: {list(df.columns)}")
-                return pd.DataFrame()
-
-            # Select only the required columns
-            df = df[required_columns]
             df["Datetime"] = pd.to_datetime(df["Datetime"])
-
-            return df
+            return df[required]
 
         except Exception as e:
-            print(f"Error fetching data for {symbol}: {e}")
+            print(f"Error fetching A-share stock: {e}")
             return pd.DataFrame()
 
-    def fetch_yfinance_data_with_datetime(
-        self,
-        symbol: str,
-        interval: str,
-        start_datetime: datetime,
-        end_datetime: datetime,
+    def fetch_akshare_fund_data(
+        self, symbol: str, start_date: str, end_date: str
     ) -> pd.DataFrame:
-        """Fetch OHLCV data from Yahoo Finance using datetime objects for exact time precision."""
+        """Fetch fund net value data (daily)."""
+        if not AKSHARE_AVAILABLE:
+            return pd.DataFrame()
+
         try:
-            yf_symbol = self.yfinance_symbols.get(symbol, symbol)
-            yf_interval = self.yfinance_intervals.get(interval, interval)
+            df = ak.fund_open_fund_info_em(symbol=symbol, indicator="单位净值走势")
 
-            print(
-                f"Fetching {yf_symbol} from {start_datetime} to {end_datetime} with interval {yf_interval}"
-            )
+            if df is None or df.empty:
+                return pd.DataFrame()
 
-            # Use datetime objects directly for yfinance
-            df = yf.download(
-                tickers=yf_symbol,
-                start=start_datetime,
-                end=end_datetime,
-                interval=yf_interval,
-                auto_adjust=True,
-                prepost=False,
+            df["Datetime"] = pd.to_datetime(df["净值日期"])
+            df["Close"] = df["单位净值"]
+            df["Open"] = df["单位净值"].shift(1).fillna(df["单位净值"].iloc[0])
+            df["High"] = df[["Open", "Close"]].max(axis=1)
+            df["Low"] = df[["Open", "Close"]].min(axis=1)
+            df["Volume"] = 1000000
+
+            df = df[
+                (df["Datetime"] >= pd.Timestamp(start_date)) &
+                (df["Datetime"] <= pd.Timestamp(end_date))
+            ]
+
+            return df[["Datetime", "Open", "High", "Low", "Close", "Volume"]]
+
+        except Exception as e:
+            print(f"Error fetching fund data: {e}")
+            return pd.DataFrame()
+
+    def fetch_akshare_etf_min_data(
+        self, symbol: str, interval: str, start_datetime: datetime, end_datetime: datetime
+    ) -> pd.DataFrame:
+        """Fetch ETF minute-level data (1m/5m/15m/30m/60m)."""
+        if not AKSHARE_AVAILABLE:
+            return pd.DataFrame()
+
+        try:
+            period_map = {"1m": "1", "5m": "5", "15m": "15", "30m": "30", "60m": "60"}
+            period = period_map.get(interval, "1")
+
+            df = ak.fund_etf_hist_min_em(
+                symbol=symbol,
+                period=period,
+                adjust="",
+                start_date=start_datetime.strftime("%Y-%m-%d %H:%M:%S"),
+                end_date=end_datetime.strftime("%Y-%m-%d %H:%M:%S")
             )
 
             if df is None or df.empty:
-                print(f"No data returned for {symbol}")
                 return pd.DataFrame()
 
-            # Ensure df is a DataFrame, not a Series
-            if isinstance(df, pd.Series):
-                df = df.to_frame()
+            df = df.rename(columns={
+                "时间": "Datetime",
+                "开盘": "Open",
+                "收盘": "Close",
+                "最高": "High",
+                "最低": "Low"
+            })
 
-            # Reset index to ensure we have a clean DataFrame
-            df = df.reset_index()
-
-            # Ensure we have a DataFrame
-            if not isinstance(df, pd.DataFrame):
+            required = ["Datetime", "Open", "High", "Low", "Close"]
+            if not all(c in df.columns for c in required):
                 return pd.DataFrame()
 
-            # Handle potential MultiIndex columns
-            if isinstance(df.columns, pd.MultiIndex):
-                df.columns = df.columns.get_level_values(0)
-
-            # Rename columns if needed
-            column_mapping = {
-                "Date": "Datetime",
-                "Open": "Open",
-                "High": "High",
-                "Low": "Low",
-                "Close": "Close",
-                "Volume": "Volume",
-            }
-
-            # Only rename columns that exist
-            existing_columns = {
-                old: new for old, new in column_mapping.items() if old in df.columns
-            }
-            df = df.rename(columns=existing_columns)
-
-            # Ensure we have the required columns
-            required_columns = ["Datetime", "Open", "High", "Low", "Close"]
-            if not all(col in df.columns for col in required_columns):
-                print(f"Warning: Missing columns. Available: {list(df.columns)}")
-                return pd.DataFrame()
-
-            # Select only the required columns
-            df = df[required_columns]
             df["Datetime"] = pd.to_datetime(df["Datetime"])
-
-            print(f"Successfully fetched {len(df)} data points for {symbol}")
-            print(f"Date range: {df['Datetime'].min()} to {df['Datetime'].max()}")
-
-            return df
+            return df[required]
 
         except Exception as e:
-            print(f"Error fetching data for {symbol}: {e}")
+            print(f"Error fetching ETF minute data: {e}")
             return pd.DataFrame()
 
-    def get_available_assets(self) -> list:
-        """Get list of available assets from the asset mapping dictionary."""
-        return sorted(list(self.asset_mapping.keys()))
+    def fetch_akshare_stock_min_data(
+        self, symbol: str, interval: str, start_datetime: datetime, end_datetime: datetime
+    ) -> pd.DataFrame:
+        """Fetch A-share stock minute-level data (1m/5m/15m/30m/60m).
 
-    def get_available_files(self, asset: str, timeframe: str) -> list:
-        """Get available data files for a specific asset and timeframe."""
-        asset_dir = self.data_dir / asset.lower()
-        if not asset_dir.exists():
-            return []
+        Uses Sina's stock_zh_a_minute (recent trading day only, but reliable).
+        Falls back to East Money's stock_zh_a_hist_min_em if Sina fails.
+        """
+        if not AKSHARE_AVAILABLE:
+            return pd.DataFrame()
 
-        pattern = f"{asset}_{timeframe}_*.csv"
-        files = list(asset_dir.glob(pattern))
-        return sorted(files)
+        try:
+            period_map = {"1m": "1", "5m": "5", "15m": "15", "30m": "30", "60m": "60"}
+            period = period_map.get(interval, "1")
+
+            clean_symbol = symbol.replace("sz", "").replace("SZ", "").replace("sh", "").replace("SH", "")
+
+            # Determine Sina prefix: sz (Shenzhen) or sh (Shanghai)
+            sina_symbol = f"sz{clean_symbol}" if not clean_symbol.startswith("6") else f"sh{clean_symbol}"
+
+            # Primary: Sina stock_zh_a_minute (more reliable for minute data)
+            df = ak.stock_zh_a_minute(symbol=sina_symbol, period=period, adjust="")
+
+            if df is not None and not df.empty:
+                df = df.rename(columns={
+                    "day": "Datetime",
+                    "open": "Open",
+                    "high": "High",
+                    "low": "Low",
+                    "close": "Close",
+                    "volume": "Volume"
+                })
+
+                required = ["Datetime", "Open", "High", "Low", "Close", "Volume"]
+                if all(c in df.columns for c in required):
+                    # Convert OHLCV columns to numeric (Sina returns strings)
+                    for c in ["Open", "High", "Low", "Close", "Volume"]:
+                        df[c] = pd.to_numeric(df[c], errors="coerce")
+                    # Drop rows with NaN after conversion
+                    df = df.dropna(subset=["Open", "High", "Low", "Close"])
+                    df["Datetime"] = pd.to_datetime(df["Datetime"])
+                    # Filter by date range
+                    df = df[(df["Datetime"] >= start_datetime) & (df["Datetime"] <= end_datetime)]
+                    if not df.empty:
+                        return df[required]
+
+        except Exception as e:
+            print(f"Sina minute data failed, falling back to East Money: {e}")
+            # Fallback: East Money stock_zh_a_hist_min_em
+            try:
+                clean_symbol = symbol.replace("sz", "").replace("SZ", "").replace("sh", "").replace("SH", "")
+                period_map = {"1m": "1", "5m": "5", "15m": "15", "30m": "30", "60m": "60"}
+                period = period_map.get(interval, "1")
+                adjust = "" if period == "1" else "hfq"
+
+                df = ak.stock_zh_a_hist_min_em(
+                    symbol=clean_symbol,
+                    period=period,
+                    adjust=adjust,
+                    start_date=start_datetime.strftime("%Y-%m-%d %H:%M:%S"),
+                    end_date=end_datetime.strftime("%Y-%m-%d %H:%M:%S")
+                )
+
+                if df is not None and not df.empty:
+                    df = df.rename(columns={
+                        "时间": "Datetime",
+                        "开盘": "Open",
+                        "收盘": "Close",
+                        "最高": "High",
+                        "最低": "Low",
+                        "成交量": "Volume"
+                    })
+
+                    required = ["Datetime", "Open", "High", "Low", "Close", "Volume"]
+                    if all(c in df.columns for c in required):
+                        df["Datetime"] = pd.to_datetime(df["Datetime"])
+                        return df[required]
+            except Exception as e2:
+                print(f"East Money fallback also failed: {e2}")
+
+        return pd.DataFrame()
+
+    def fetch_akshare_index_min_data(
+        self, symbol: str, interval: str, start_datetime: datetime, end_datetime: datetime
+    ) -> pd.DataFrame:
+        """Fetch A-share index minute-level data (1m/5m/15m/30m/60m).
+
+        Uses Sina's CN_MarketDataService.getKLineData API directly
+        (akshare's index_zh_a_hist_min_em is unstable for East Money).
+        """
+        if not AKSHARE_AVAILABLE:
+            return pd.DataFrame()
+
+        try:
+            period_map = {"1m": "1", "5m": "5", "15m": "15", "30m": "30", "60m": "60"}
+            period = period_map.get(interval, "1")
+
+            clean_symbol = symbol.replace("sz", "").replace("SZ", "").replace("sh", "").replace("SH", "")
+            sina_prefix = "sh" if clean_symbol.startswith(("0", "9")) else "sz"
+            sina_symbol = f"{sina_prefix}{clean_symbol}"
+
+            url = "https://quotes.sina.cn/cn/api/jsonp_v2.php/=/CN_MarketDataService.getKLineData"
+            params = {
+                "symbol": sina_symbol,
+                "scale": period,
+                "ma": "no",
+                "datalen": "1023",
+            }
+            r = requests.get(url, params=params, headers={"Referer": "https://finance.sina.com.cn"}, timeout=15)
+            text = r.text
+            # Parse JSONP: strip the callback wrapper
+            json_start = text.find("(")
+            json_end = text.rfind(")")
+            if json_start == -1 or json_end == -1:
+                print(f"Sina index minute JSONP parse failed: {text[:200]}")
+                return pd.DataFrame()
+
+            data = json.loads(text[json_start + 1:json_end])
+            if not data:
+                return pd.DataFrame()
+
+            df = pd.DataFrame(data)
+            df = df.rename(columns={
+                "day": "Datetime",
+                "open": "Open",
+                "high": "High",
+                "low": "Low",
+                "close": "Close",
+                "volume": "Volume"
+            })
+
+            # Convert OHLCV to numeric
+            for c in ["Open", "High", "Low", "Close", "Volume"]:
+                df[c] = pd.to_numeric(df[c], errors="coerce")
+            df = df.dropna(subset=["Open", "High", "Low", "Close"])
+
+            required = ["Datetime", "Open", "High", "Low", "Close", "Volume"]
+            if not all(c in df.columns for c in required):
+                print(f"Index minute missing columns: {df.columns.tolist()}")
+                return pd.DataFrame()
+
+            df["Datetime"] = pd.to_datetime(df["Datetime"])
+            # Filter by date range
+            df = df[(df["Datetime"] >= start_datetime) & (df["Datetime"] <= end_datetime)]
+            if df.empty:
+                return pd.DataFrame()
+
+            return df[required]
+
+        except Exception as e:
+            print(f"Error fetching index minute data: {e}")
+            return pd.DataFrame()
+
+    def fetch_akshare_index_data(
+        self, symbol: str, start_date: str, end_date: str
+    ) -> pd.DataFrame:
+        """Fetch A-share index daily data via stock_zh_index_daily (Sina)."""
+        if not AKSHARE_AVAILABLE:
+            return pd.DataFrame()
+
+        try:
+            # symbol like SH000001 -> sh000001
+            sina_symbol = symbol.lower()
+            if not sina_symbol.startswith(("sh", "sz")):
+                # Try to infer: codes starting with 6 are Shanghai (sh), others Shenzhen (sz)
+                clean = symbol.replace("sh", "").replace("SH", "").replace("sz", "").replace("SZ", "")
+                if clean.startswith("6"):
+                    sina_symbol = f"sh{clean}"
+                else:
+                    sina_symbol = f"sz{clean}"
+
+            df = ak.stock_zh_index_daily(symbol=sina_symbol)
+
+            if df is None or df.empty:
+                return pd.DataFrame()
+
+            df = df.rename(columns={
+                "date": "Datetime",
+                "open": "Open",
+                "high": "High",
+                "low": "Low",
+                "close": "Close",
+                "volume": "Volume"
+            })
+
+            required = ["Datetime", "Open", "High", "Low", "Close", "Volume"]
+            if not all(c in df.columns for c in required):
+                print(f"Index missing columns: {df.columns.tolist()}")
+                return pd.DataFrame()
+
+            df["Datetime"] = pd.to_datetime(df["Datetime"])
+            df = df[
+                (df["Datetime"] >= pd.Timestamp(start_date)) &
+                (df["Datetime"] <= pd.Timestamp(end_date))
+            ]
+
+            return df[required]
+
+        except Exception as e:
+            print(f"Error fetching index data: {e}")
+            return pd.DataFrame()
+
+    def detect_asset_type(self, symbol: str) -> str:
+        """Detect asset type from symbol format."""
+        clean_upper = symbol.upper()
+        clean = clean_upper.replace("SZ", "").replace("SH", "")
+
+        # 6-digit codes — check by prefix, not by SH/SZ (stocks also use those)
+        if clean.isdigit() and len(clean) == 6:
+            # A-share indices: 000001(上证), 399001(深成), 399006(创业板), 000300(沪深300), etc.
+            # They use specific index code ranges, distinct from regular stocks
+            if clean_upper.startswith(("SH", "SZ")) and clean in (
+                "000001", "399001", "399006", "000300", "000016", "000905",
+                "000852", "000688", "000015", "000009", "000002", "000003",
+            ):
+                return "a_index"
+            # ETFs
+            if clean.startswith(("159", "510", "511", "512", "513", "515", "516", "518")):
+                return "etf"
+            # A-shares: 000xxx, 001xxx, 002xxx, 300xxx, 301xxx, 600xxx, 601xxx, 603xxx, 605xxx, 688xxx, 689xxx
+            if clean.startswith(("000", "001", "002", "003", "300", "301", "600", "601", "603", "605", "688", "689")):
+                return "stock"
+            # Open-end funds
+            if clean.startswith(("004", "005", "006", "007", "008", "009", "010", "011", "012", "013", "014", "015", "016", "017", "018", "019", "020")):
+                return "fund"
+
+        return "stock"
+
+    def fetch_data(
+        self, symbol: str, timeframe: str, start_date: str, end_date: str,
+        start_time: str = "00:00", end_time: str = "23:59"
+    ) -> pd.DataFrame:
+        """Route to correct data fetcher based on symbol and timeframe."""
+        asset_type = self.detect_asset_type(symbol)
+
+        # Minute-level data (A-share stocks, ETFs, and indices)
+        if timeframe in ["1m", "5m", "15m", "30m", "60m"]:
+            try:
+                start_dt = datetime.strptime(f"{start_date} {start_time}", "%Y-%m-%d %H:%M")
+                end_dt = datetime.strptime(f"{end_date} {end_time}", "%Y-%m-%d %H:%M")
+            except ValueError:
+                return pd.DataFrame()
+
+            if asset_type == "stock":
+                return self.fetch_akshare_stock_min_data(symbol, timeframe, start_dt, end_dt)
+            elif asset_type == "etf":
+                return self.fetch_akshare_etf_min_data(symbol, timeframe, start_dt, end_dt)
+            elif asset_type == "a_index":
+                return self.fetch_akshare_index_min_data(symbol, timeframe, start_dt, end_dt)
+
+        # Daily-level data
+        if asset_type == "a_index":
+            return self.fetch_akshare_index_data(symbol, start_date, end_date)
+        elif asset_type == "fund" or asset_type == "etf":
+            return self.fetch_akshare_fund_data(symbol, start_date, end_date)
+        else:
+            return self.fetch_akshare_stock_data(symbol, start_date, end_date)
 
     def run_analysis(
-        self, df: pd.DataFrame, asset_name: str, timeframe: str
+        self, df: pd.DataFrame, asset_name: str, timeframe: str = "1d",
+        start_date: str = "", end_date: str = ""
     ) -> Dict[str, Any]:
-        """Run the trading analysis on the provided DataFrame."""
+        """Run full multi-agent analysis pipeline."""
         try:
-            # Debug: Check DataFrame structure
-            print(f"DataFrame columns: {df.columns}")
-            print(f"DataFrame index: {type(df.index)}")
-            print(f"DataFrame shape: {df.shape}")
-
-            # Prepare data for analysis
-            # if len(df) > 49:
-            #     df_slice = df.tail(49).iloc[:-3]
-            # else:
-            #     df_slice = df.tail(45)
-
             df_slice = df.tail(45)
 
-            # Ensure DataFrame has the expected structure
-            required_columns = ["Datetime", "Open", "High", "Low", "Close"]
-            if not all(col in df_slice.columns for col in required_columns):
-                return {
-                    "success": False,
-                    "error": f"Missing required columns. Available: {list(df_slice.columns)}",
-                }
+            required = ["Datetime", "Open", "High", "Low", "Close"]
+            if not all(c in df_slice.columns for c in required):
+                return {"success": False, "error": f"Missing columns"}
 
-            # Reset index to avoid any MultiIndex issues
             df_slice = df_slice.reset_index(drop=True)
 
-            # Debug: Check the slice before conversion
-            print(f"Slice columns: {df_slice.columns}")
-            print(f"Slice index: {type(df_slice.index)}")
-
-            # Convert to dict for tool input - use explicit conversion to avoid tuple keys
             df_slice_dict = {}
-            for col in required_columns:
+            for col in required:
                 if col == "Datetime":
-                    # Convert datetime objects to strings for JSON serialization
-                    df_slice_dict[col] = (
-                        df_slice[col].dt.strftime("%Y-%m-%d %H:%M:%S").tolist()
-                    )
+                    df_slice_dict[col] = df_slice[col].dt.strftime("%Y-%m-%d %H:%M:%S").tolist()
                 else:
                     df_slice_dict[col] = df_slice[col].tolist()
 
-            # Debug: Check the resulting dictionary
-            print(f"Dictionary keys: {list(df_slice_dict.keys())}")
-            print(f"Dictionary key types: {[type(k) for k in df_slice_dict.keys()]}")
+            date_range = ""
+            if start_date and end_date:
+                date_range = f"{start_date} ~ {end_date}"
 
-            # Format timeframe for display
-            display_timeframe = timeframe
-            if timeframe.endswith("h"):
-                display_timeframe += "our"
-            elif timeframe.endswith("m"):
-                display_timeframe += "in"
-            elif timeframe.endswith("d"):
-                display_timeframe += "ay"
-            elif timeframe == "1w":
-                display_timeframe = "1 week"
-            elif timeframe == "1mo":
-                display_timeframe = "1 month"
+            # Use a shared timestamp so both images land in the same directory
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            p_image = static_util.generate_kline_image(df_slice_dict, stock_name=asset_name, timeframe=timeframe, date_range=date_range, run_ts=ts)
+            t_image = static_util.generate_trend_image(df_slice_dict, stock_name=asset_name, timeframe=timeframe, date_range=date_range, run_ts=ts)
 
-            p_image = static_util.generate_kline_image(df_slice_dict)
-            t_image = static_util.generate_trend_image(df_slice_dict)
-
-            # Create initial state
             initial_state = {
                 "kline_data": df_slice_dict,
+                "trend_data": df_slice_dict,
                 "analysis_results": None,
                 "messages": [],
-                "time_frame": display_timeframe,
+                "time_frame": timeframe,
                 "stock_name": asset_name,
-                "pattern_image": p_image["pattern_image"],
-                "trend_image": t_image["trend_image"],
+                "pattern_image": p_image.get("pattern_image", ""),
+                "trend_image": t_image.get("trend_image", ""),
             }
 
-            # Run the trading graph
             final_state = self.trading_graph.graph.invoke(initial_state)
 
             return {
                 "success": True,
                 "final_state": final_state,
                 "asset_name": asset_name,
-                "timeframe": display_timeframe,
                 "data_length": len(df_slice),
+                "pattern_image": p_image.get("pattern_image", ""),
+                "trend_image": t_image.get("trend_image", ""),
             }
 
         except Exception as e:
-            error_msg = str(e)
-            
-            # Get current provider from config
-            provider = self.config.get("agent_llm_provider", "openai")
-            if provider == "openai":
-                provider_name = "OpenAI"
-            elif provider == "anthropic":
-                provider_name = "Anthropic"
-            elif provider == "minimax":
-                provider_name = "MiniMax"
-            else:
-                provider_name = "Qwen"
-
-            # Check for specific API key authentication errors
-            if (
-                "authentication" in error_msg.lower()
-                or "invalid api key" in error_msg.lower()
-                or "401" in error_msg
-                or "invalid_api_key" in error_msg.lower()
-            ):
-                return {
-                    "success": False,
-                    "error": f"❌ Invalid API Key: The {provider_name} API key you provided is invalid or has expired. Please check your API key in the Settings section and try again.",
-                }
-            elif "rate limit" in error_msg.lower() or "429" in error_msg:
-                return {
-                    "success": False,
-                    "error": f"⚠️ Rate Limit Exceeded: You've hit the {provider_name} API rate limit. Please wait a moment and try again.",
-                }
-            elif "quota" in error_msg.lower() or "billing" in error_msg.lower():
-                return {
-                    "success": False,
-                    "error": f"💳 Billing Issue: Your {provider_name} account has insufficient credits or billing issues. Please check your {provider_name} account.",
-                }
-            elif "network" in error_msg.lower() or "connection" in error_msg.lower():
-                return {
-                    "success": False,
-                    "error": f"🌐 Network Error: Unable to connect to {provider_name} servers. Please check your internet connection and try again.",
-                }
-            else:
-                return {"success": False, "error": f"❌ Analysis Error: {error_msg}"}
-
-    def extract_analysis_results(self, results: Dict[str, Any]) -> Dict[str, Any]:
-        """Extract and format analysis results for web display."""
-        if not results["success"]:
-            return {"error": results["error"]}
-
-        final_state = results["final_state"]
-
-        # Extract analysis results from state fields
-        technical_indicators = final_state.get("indicator_report", "")
-        pattern_analysis = final_state.get("pattern_report", "")
-        trend_analysis = final_state.get("trend_report", "")
-        final_decision_raw = final_state.get("final_trade_decision", "")
-
-        # Extract chart data if available
-        pattern_chart = final_state.get("pattern_image", "")
-        trend_chart = final_state.get("trend_image", "")
-        pattern_image_filename = final_state.get("pattern_image_filename", "")
-        trend_image_filename = final_state.get("trend_image_filename", "")
-
-        # Parse final decision
-        final_decision = ""
-        if final_decision_raw:
-            try:
-                # Try to extract JSON from the decision
-                start = final_decision_raw.find("{")
-                end = final_decision_raw.rfind("}") + 1
-                if start != -1 and end != 0:
-                    json_str = final_decision_raw[start:end]
-                    decision_data = json.loads(json_str)
-                    final_decision = {
-                        "decision": decision_data.get("decision", "N/A"),
-                        "risk_reward_ratio": decision_data.get(
-                            "risk_reward_ratio", "N/A"
-                        ),
-                        "forecast_horizon": decision_data.get(
-                            "forecast_horizon", "N/A"
-                        ),
-                        "justification": decision_data.get("justification", "N/A"),
-                    }
-                else:
-                    # If no JSON found, return the raw text
-                    final_decision = {"raw": final_decision_raw}
-            except json.JSONDecodeError:
-                # If JSON parsing fails, return the raw text
-                final_decision = {"raw": final_decision_raw}
-
-        return {
-            "success": True,
-            "asset_name": results["asset_name"],
-            "timeframe": results["timeframe"],
-            "data_length": results["data_length"],
-            "technical_indicators": technical_indicators,
-            "pattern_analysis": pattern_analysis,
-            "trend_analysis": trend_analysis,
-            "pattern_chart": pattern_chart,
-            "trend_chart": trend_chart,
-            "pattern_image_filename": pattern_image_filename,
-            "trend_image_filename": trend_image_filename,
-            "final_decision": final_decision,
-        }
-
-    def get_timeframe_date_limits(self, timeframe: str) -> Dict[str, Any]:
-        """Get valid date range limits for a given timeframe."""
-        limits = {
-            "1m": {"max_days": 7, "description": "1 minute data: max 7 days"},
-            "2m": {"max_days": 60, "description": "2 minute data: max 60 days"},
-            "5m": {"max_days": 60, "description": "5 minute data: max 60 days"},
-            "15m": {"max_days": 60, "description": "15 minute data: max 60 days"},
-            "30m": {"max_days": 60, "description": "30 minute data: max 60 days"},
-            "60m": {"max_days": 730, "description": "1 hour data: max 730 days"},
-            "90m": {"max_days": 60, "description": "90 minute data: max 60 days"},
-            "1h": {"max_days": 730, "description": "1 hour data: max 730 days"},
-            "4h": {"max_days": 730, "description": "4 hour data: max 730 days"},
-            "1d": {"max_days": 730, "description": "1 day data: max 730 days"},
-            "5d": {"max_days": 60, "description": "5 day data: max 60 days"},
-            "1w": {"max_days": 730, "description": "1 week data: max 730 days"},
-            "1wk": {"max_days": 730, "description": "1 week data: max 730 days"},
-            "1mo": {"max_days": 730, "description": "1 month data: max 730 days"},
-            "3mo": {"max_days": 730, "description": "3 month data: max 730 days"},
-        }
-
-        return limits.get(
-            timeframe, {"max_days": 730, "description": "Default: max 730 days"}
-        )
-
-    def validate_date_range(
-        self,
-        start_date: str,
-        end_date: str,
-        timeframe: str,
-        start_time: str = "00:00",
-        end_time: str = "23:59",
-    ) -> Dict[str, Any]:
-        """Validate date and time range for the given timeframe."""
-        try:
-            # Create datetime objects with time
-            start_datetime_str = f"{start_date} {start_time}"
-            end_datetime_str = f"{end_date} {end_time}"
-
-            start = datetime.strptime(start_datetime_str, "%Y-%m-%d %H:%M")
-            end = datetime.strptime(end_datetime_str, "%Y-%m-%d %H:%M")
-
-            if start >= end:
-                return {
-                    "valid": False,
-                    "error": "Start date/time must be before end date/time",
-                }
-
-            # Get timeframe limits
-            limits = self.get_timeframe_date_limits(timeframe)
-            max_days = limits["max_days"]
-
-            # Calculate time difference in days (including fractional days)
-            time_diff = end - start
-            days_diff = time_diff.total_seconds() / (24 * 3600)  # Convert to days
-
-            if days_diff > max_days:
-                return {
-                    "valid": False,
-                    "error": f"Time range too large. {limits['description']}. Please select a smaller range.",
-                    "max_days": max_days,
-                    "current_days": round(days_diff, 2),
-                }
-
-            return {"valid": True, "days": round(days_diff, 2)}
-
-        except ValueError as e:
-            return {"valid": False, "error": f"Invalid date/time format: {str(e)}"}
-
-    def validate_api_key(self, provider: str = None) -> Dict[str, Any]:
-        """Validate the current API key by making a simple test call."""
-        try:
-            # Get provider from config if not provided
-            if provider is None:
-                provider = self.config.get("agent_llm_provider", "openai")
-            
-            if provider == "openai":
-                from openai import OpenAI
-                client = OpenAI()
-                
-                # Make a simple test call
-                _ = client.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=[{"role": "user", "content": "Hello"}],
-                    max_tokens=5,
-                )
-                
-                provider_name = "OpenAI"
-            elif provider == "anthropic":
-                from anthropic import Anthropic
-                api_key = os.environ.get("ANTHROPIC_API_KEY") or self.config.get("anthropic_api_key", "")
-                if not api_key:
-                    return {
-                        "valid": False,
-                        "error": "❌ Invalid API Key: The Anthropic API key is not set. Please update it in the Settings section.",
-                    }
-                
-                client = Anthropic(api_key=api_key)
-                
-                # Make a simple test call
-                _ = client.messages.create(
-                    model="claude-haiku-4-5-20251001",
-                    max_tokens=5,
-                    messages=[{"role": "user", "content": "Hello"}],
-                )
-                
-                provider_name = "Anthropic"
-            elif provider == "qwen":
-                from langchain_qwq import ChatQwen
-                api_key = os.environ.get("DASHSCOPE_API_KEY") or self.config.get("qwen_api_key", "")
-                if not api_key:
-                    return {
-                        "valid": False,
-                        "error": "❌ Invalid API Key: The Qwen API key is not set. Please update it in the Settings section.",
-                    }
-
-                # Make a simple test call using LangChain
-                llm = ChatQwen(model="qwen-flash", api_key=api_key)
-                _ = llm.invoke([("user", "Hello")])
-
-                provider_name = "Qwen"
-            else:  # minimax
-                from openai import OpenAI as _OpenAI
-                api_key = os.environ.get("MINIMAX_API_KEY") or self.config.get("minimax_api_key", "")
-                if not api_key:
-                    return {
-                        "valid": False,
-                        "error": "❌ Invalid API Key: The MiniMax API key is not set. Please update it in the Settings section.",
-                    }
-
-                client = _OpenAI(api_key=api_key, base_url="https://api.minimax.io/v1")
-                _ = client.chat.completions.create(
-                    model="MiniMax-M2.7-highspeed",
-                    messages=[{"role": "user", "content": "Hello"}],
-                    max_tokens=5,
-                )
-
-                provider_name = "MiniMax"
-            return {"valid": True, "message": f"{provider_name} API key is valid"}
-
-        except Exception as e:
-            error_msg = str(e)
-            
-            # Determine provider name for error messages
-            if provider is None:
-                provider = self.config.get("agent_llm_provider", "openai")
-            if provider == "openai":
-                provider_name = "OpenAI"
-            elif provider == "anthropic":
-                provider_name = "Anthropic"
-            elif provider == "minimax":
-                provider_name = "MiniMax"
-            else:
-                provider_name = "Qwen"
-
-            if (
-                "authentication" in error_msg.lower()
-                or "invalid api key" in error_msg.lower()
-                or "401" in error_msg
-                or "invalid_api_key" in error_msg.lower()
-            ):
-                return {
-                    "valid": False,
-                    "error": f"❌ Invalid API Key: The {provider_name} API key is invalid or has expired. Please update it in the Settings section.",
-                }
-            elif "rate limit" in error_msg.lower() or "429" in error_msg:
-                return {
-                    "valid": False,
-                    "error": f"⚠️ Rate Limit Exceeded: You've hit the {provider_name} API rate limit. Please wait a moment and try again.",
-                }
-            elif "quota" in error_msg.lower() or "billing" in error_msg.lower():
-                return {
-                    "valid": False,
-                    "error": f"💳 Billing Issue: Your {provider_name} account has insufficient credits or billing issues. Please check your {provider_name} account.",
-                }
-            elif "network" in error_msg.lower() or "connection" in error_msg.lower():
-                return {
-                    "valid": False,
-                    "error": f"🌐 Network Error: Unable to connect to {provider_name} servers. Please check your internet connection.",
-                }
-            else:
-                return {"valid": False, "error": f"❌ API Key Error: {error_msg}"}
-
-    def load_custom_assets(self) -> list:
-        """Load custom assets from persistent JSON file."""
-        try:
-            if self.custom_assets_file.exists():
-                with open(self.custom_assets_file, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    if isinstance(data, list):
-                        return data
-            return []
-        except Exception as e:
-            print(f"Error loading custom assets: {e}")
-            return []
-
-    def save_custom_asset(self, symbol: str) -> bool:
-        """Save a custom asset symbol persistently (avoid duplicates)."""
-        try:
-            symbol = symbol.strip()
-            if not symbol:
-                return False
-            if symbol in self.custom_assets:
-                return True  # already present
-            self.custom_assets.append(symbol)
-            # write to file
-            with open(self.custom_assets_file, "w", encoding="utf-8") as f:
-                json.dump(self.custom_assets, f, indent=2)
-            return True
-        except Exception as e:
-            print(f"Error saving custom asset '{symbol}': {e}")
-            return False
+            import traceback
+            traceback.print_exc()
+            return {"success": False, "error": str(e)}
 
 
-# Initialize the analyzer
 analyzer = WebTradingAnalyzer()
 
 
 @app.route("/")
 def index():
-    """Main landing page - redirect to demo."""
     return render_template("demo_new.html")
-
-
-@app.route("/demo")
-def demo():
-    """Demo page with new interface."""
-    return render_template("demo_new.html")
-
-
-@app.route("/output")
-def output():
-    """Output page with analysis results."""
-    # Get results from session or query parameters
-    results = request.args.get("results")
-    if results:
-        try:
-            # Handle URL-encoded results
-            results = urllib.parse.unquote(results)
-            results_data = json.loads(results)
-            return render_template("output.html", results=results_data)
-        except (json.JSONDecodeError, Exception) as e:
-            print(f"Error parsing results: {e}")
-            # Fall back to default results
-
-    # Default results if none provided
-    default_results = {
-        "asset_name": "BTC",
-        "timeframe": "1h",
-        "data_length": 1247,
-        "technical_indicators": "RSI (14): 65.4 - Neutral to bullish momentum\nMACD: Bullish crossover with increasing histogram\nMoving Averages: Price above 50-day and 200-day MA\nBollinger Bands: Price in upper band, showing strength\nVolume: Above average volume supporting price action",
-        "pattern_analysis": "Bull Flag Pattern: Consolidation after strong upward move\nGolden Cross: 50-day MA crossing above 200-day MA\nHigher Highs & Higher Lows: Uptrend confirmation\nVolume Pattern: Increasing volume on price advances",
-        "trend_analysis": "Primary Trend: Bullish (Long-term)\nSecondary Trend: Bullish (Medium-term)\nShort-term Trend: Consolidating with bullish bias\nADX: 28.5 - Moderate trend strength\nPrice Action: Higher highs and higher lows maintained\nMomentum: Positive divergence on RSI",
-        "pattern_chart": "",
-        "trend_chart": "",
-        "pattern_image_filename": "",
-        "trend_image_filename": "",
-        "final_decision": {
-            "decision": "LONG",
-            "risk_reward_ratio": "1:2.5",
-            "forecast_horizon": "24-48 hours",
-            "justification": "Based on comprehensive analysis of technical indicators, pattern recognition, and trend analysis, the system recommends a LONG position on BTC. The analysis shows strong bullish momentum with key support levels holding, and multiple technical indicators confirming upward movement.",
-        },
-    }
-
-    return render_template("output.html", results=default_results)
 
 
 @app.route("/api/analyze", methods=["POST"])
 def analyze():
     try:
         data = request.get_json()
-        data_source = data.get("data_source")
         asset = data.get("asset")
-        timeframe = data.get("timeframe")
-        redirect_to_output = data.get("redirect_to_output", False)
-
-        if data_source != "live":
-            return jsonify({"error": "Only live Yahoo Finance data is supported."})
-
-        # Live Yahoo Finance data only
+        timeframe = data.get("timeframe", "1d")
         start_date = data.get("start_date")
-        start_time = data.get("start_time", "00:00")
         end_date = data.get("end_date")
+        start_time = data.get("start_time", "00:00")
         end_time = data.get("end_time", "23:59")
-        use_current_time = data.get("use_current_time", False)
 
-        # Create datetime objects for validation
-        if start_date:
-            start_datetime_str = f"{start_date} {start_time}"
-            try:
-                start_dt = datetime.strptime(start_datetime_str, "%Y-%m-%d %H:%M")
-            except ValueError:
-                return jsonify({"error": "Invalid start date/time format."})
+        if not all([asset, start_date, end_date]):
+            return jsonify({"error": "Missing: asset, start_date, end_date"})
 
-            if start_dt > datetime.now():
-                return jsonify({"error": "Start date/time cannot be in the future."})
+        # Fetch data
+        print(f"Fetching data: {asset} {timeframe} {start_date} to {end_date}")
+        df = analyzer.fetch_data(asset, timeframe, start_date, end_date, start_time, end_time)
 
-        if end_date:
-            if use_current_time:
-                end_dt = datetime.now()
-            else:
-                end_datetime_str = f"{end_date} {end_time}"
-                try:
-                    end_dt = datetime.strptime(end_datetime_str, "%Y-%m-%d %H:%M")
-                except ValueError:
-                    return jsonify({"error": "Invalid end date/time format."})
-
-                if end_dt > datetime.now():
-                    return jsonify({"error": "End date/time cannot be in the future."})
-
-            if start_date and start_dt and end_dt and end_dt < start_dt:
-                return jsonify(
-                    {"error": "End date/time cannot be earlier than start date/time."}
-                )
-
-        # Fetch data with datetime objects
-        df = analyzer.fetch_yfinance_data_with_datetime(
-            asset, timeframe, start_dt, end_dt
-        )
         if df.empty:
-            return jsonify({"error": "No data available for the specified parameters"})
+            return jsonify({"error": f"No data for {asset}"})
 
-        display_name = analyzer.asset_mapping.get(asset, asset)
-        if display_name is None:
-            display_name = asset
-        results = analyzer.run_analysis(df, display_name, timeframe)
-        formatted_results = analyzer.extract_analysis_results(results)
+        print(f"Got {len(df)} rows, running analysis...")
+        results = analyzer.run_analysis(df, f"{asset}", timeframe, start_date, end_date)
 
-        # If redirect is requested, return redirect URL with results
-        if redirect_to_output:
-            if formatted_results.get("success", False):
-                # Create a version without base64 images for URL encoding
-                # Base64 images are too large for URL parameters
-                url_safe_results = formatted_results.copy()
-                url_safe_results["pattern_chart"] = ""  # Remove base64 data
-                url_safe_results["trend_chart"] = ""  # Remove base64 data
+        if not results.get("success"):
+            return jsonify({"error": results.get("error", "Analysis failed")})
 
-                # Encode results for URL
-                results_json = json.dumps(url_safe_results)
-                encoded_results = urllib.parse.quote(results_json)
-                redirect_url = f"/output?results={encoded_results}"
+        final_state = results.get("final_state", {})
 
-                # Store full results (with images) in session or temporary storage
-                # For now, we'll pass them back in the response for the frontend to handle
-                return jsonify(
-                    {
-                        "redirect": redirect_url,
-                        "full_results": formatted_results,  # Include images in response body
-                    }
-                )
+        # Clean final_trade_decision: strip ```json code fence if present
+        raw_decision = final_state.get("final_trade_decision", "")
+        parsed = None
+        cleaned_decision = ""
+        if isinstance(raw_decision, str):
+            # Remove ```json or ``` markdown fences
+            match = re.search(r'```(?:json)?\s*(\{[\s\S]*?\})\s*```', raw_decision)
+            if match:
+                json_str = match.group(1)
+                try:
+                    parsed = json.loads(json_str)
+                except json.JSONDecodeError:
+                    parsed = None
+                # Display the JSON content without fences
+                cleaned_decision = json.dumps(parsed, ensure_ascii=False, indent=2) if parsed else json_str
             else:
-                return jsonify(
-                    {"error": formatted_results.get("error", "Analysis failed")}
-                )
+                try:
+                    parsed = json.loads(raw_decision)
+                    cleaned_decision = json.dumps(parsed, ensure_ascii=False, indent=2)
+                except json.JSONDecodeError:
+                    cleaned_decision = raw_decision
 
-        return jsonify(formatted_results)
+        # Extract structured decision fields
+        decision_direction = ""
+        entry_price = None
+        stop_loss = None
+        take_profit = None
+        if parsed:
+            decision_direction = parsed.get("决策", parsed.get("direction", parsed.get("decision", "")))
+            entry_price = parsed.get("入场价格", parsed.get("entry_price"))
+            stop_loss = parsed.get("止损价格", parsed.get("stop_loss"))
+            take_profit = parsed.get("止盈价格", parsed.get("take_profit"))
+
+        full_response = {
+            "success": True,
+            "redirect": "/output",
+            "asset_name": results["asset_name"],
+            "data_length": results["data_length"],
+            "indicator_report": final_state.get("indicator_report", ""),
+            "pattern_report": final_state.get("pattern_report", ""),
+            "trend_report": final_state.get("trend_report", ""),
+            "final_trade_decision": cleaned_decision,
+            "decision_direction": decision_direction,
+            "entry_price": entry_price or final_state.get("entry_price"),
+            "stop_loss": stop_loss or final_state.get("stop_loss"),
+            "take_profit": take_profit or final_state.get("take_profit"),
+            "indicators": {
+                "rsi": final_state.get("rsi"),
+                "macd": final_state.get("macd"),
+                "macd_signal": final_state.get("macd_signal"),
+                "macd_hist": final_state.get("macd_hist"),
+                "stoch_k": final_state.get("stoch_k"),
+                "stoch_d": final_state.get("stoch_d"),
+                "roc": final_state.get("roc"),
+                "willr": final_state.get("willr"),
+            },
+            "pattern_chart": results.get("pattern_image", ""),
+            "trend_chart": results.get("trend_image", ""),
+        }
+
+        # Return as both response and full_results for redirect handling
+        return jsonify({
+            "redirect": "/output",
+            "full_results": full_response
+        })
+
     except Exception as e:
+        print(f"Error: {e}")
         return jsonify({"error": str(e)})
 
 
-@app.route("/api/files/<asset>/<timeframe>")
-def get_files(asset, timeframe):
-    """API endpoint to get available files for an asset/timeframe."""
+@app.route("/api/asset-info/<symbol>")
+def asset_info(symbol):
+    """Return detected asset type info."""
+    asset_type = analyzer.detect_asset_type(symbol)
+    return jsonify({"symbol": symbol, "type": asset_type})
+
+
+@app.route("/api/health")
+def health():
+    """Health check endpoint."""
+    return jsonify({"status": "ok"})
+
+
+@app.route("/api/test-data", methods=["POST"])
+def test_data():
+    """Test data fetching without running analysis."""
     try:
-        files = analyzer.get_available_files(asset, timeframe)
-        file_list = []
+        data = request.get_json()
+        asset = data.get("asset")
+        timeframe = data.get("timeframe", "1d")
+        start_date = data.get("start_date")
+        end_date = data.get("end_date")
+        start_time = data.get("start_time", "00:00")
+        end_time = data.get("end_time", "23:59")
 
-        for i, file_path in enumerate(files):
-            match = re.search(r"_(\d+)\.csv$", file_path.name)
-            file_number = match.group(1) if match else "N/A"
-            file_list.append(
-                {"index": i, "number": file_number, "name": file_path.name}
-            )
+        if not all([asset, start_date, end_date]):
+            return jsonify({"error": "Missing: asset, start_date, end_date"})
 
-        return jsonify({"files": file_list})
+        print(f"Fetching data: {asset} {timeframe} {start_date} to {end_date}")
+        df = analyzer.fetch_data(asset, timeframe, start_date, end_date, start_time, end_time)
 
+        if df.empty:
+            return jsonify({"error": f"No data for {asset}"})
+
+        # Return data summary
+        return jsonify({
+            "success": True,
+            "rows": len(df),
+            "columns": df.columns.tolist(),
+            "first_row": df.head(1).to_dict("records")[0] if len(df) > 0 else None,
+            "last_row": df.tail(1).to_dict("records")[0] if len(df) > 0 else None,
+            "date_range": {
+                "start": str(df["Datetime"].min()),
+                "end": str(df["Datetime"].max()),
+            }
+        })
     except Exception as e:
+        print(f"Error: {e}")
         return jsonify({"error": str(e)})
+
+
+@app.route("/output")
+def output():
+    results = request.args.get("results")
+    if results:
+        try:
+            results = urllib.parse.unquote(results)
+            return render_template("output.html", results=json.loads(results))
+        except Exception as e:
+            print(f"Error parsing results: {e}")
+
+    return render_template("output.html", results={
+        "asset_name": "",
+        "timeframe": "1d",
+        "data_length": 0,
+        "indicator_report": "",
+        "pattern_report": "",
+        "trend_report": "",
+        "final_trade_decision": "",
+        "decision_direction": "",
+        "entry_price": None,
+        "stop_loss": None,
+        "take_profit": None,
+        "indicators": {},
+        "pattern_chart": "",
+        "trend_chart": "",
+    })
+
+
+@app.route("/api/custom-assets")
+def get_custom_assets():
+    """Return list of custom assets saved on the server."""
+    try:
+        assets_file = Path("data/custom_assets.json")
+        if assets_file.exists():
+            with open(assets_file, "r", encoding="utf-8") as f:
+                return jsonify({"custom_assets": json.load(f)})
+        return jsonify({"custom_assets": []})
+    except Exception as e:
+        print(f"Error loading custom assets: {e}")
+        return jsonify({"custom_assets": []})
 
 
 @app.route("/api/save-custom-asset", methods=["POST"])
 def save_custom_asset():
-    """Save a custom asset symbol server-side for persistence."""
+    """Save a custom asset symbol to server."""
     try:
         data = request.get_json()
-        symbol = (data.get("symbol") or "").strip()
+        symbol = data.get("symbol", "").strip()
         if not symbol:
-            return jsonify({"success": False, "error": "Symbol required"}), 400
+            return jsonify({"success": False, "error": "No symbol provided"})
 
-        ok = analyzer.save_custom_asset(symbol)
-        if not ok:
-            return jsonify({"success": False, "error": "Failed to save symbol"}), 500
+        assets_file = Path("data/custom_assets.json")
+        assets_file.parent.mkdir(exist_ok=True)
+
+        custom_assets = []
+        if assets_file.exists():
+            with open(assets_file, "r", encoding="utf-8") as f:
+                custom_assets = json.load(f)
+
+        if symbol not in custom_assets:
+            custom_assets.append(symbol)
+            with open(assets_file, "w", encoding="utf-8") as f:
+                json.dump(custom_assets, f)
 
         return jsonify({"success": True, "symbol": symbol})
     except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
-
-
-@app.route("/api/custom-assets", methods=["GET"])
-def custom_assets():
-    """Return server-persisted custom assets."""
-    try:
-        return jsonify({"custom_assets": analyzer.custom_assets or []})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route("/api/assets")
-def get_assets():
-    """API endpoint to get available assets."""
-    try:
-        assets = analyzer.get_available_assets()
-        asset_list = []
-
-        for asset in assets:
-            asset_list.append(
-                {"code": asset, "name": analyzer.asset_mapping.get(asset, asset)}
-            )
-
-        # Include server-persisted custom assets at the end
-        for custom in analyzer.custom_assets:
-            asset_list.append({"code": custom, "name": custom})
-
-        return jsonify({"assets": asset_list})
-
-    except Exception as e:
-        return jsonify({"error": str(e)})
-
-
-@app.route("/api/timeframe-limits/<timeframe>")
-def get_timeframe_limits(timeframe):
-    """API endpoint to get date range limits for a timeframe."""
-    try:
-        limits = analyzer.get_timeframe_date_limits(timeframe)
-        return jsonify(limits)
-    except Exception as e:
-        return jsonify({"error": str(e)})
-
-
-@app.route("/api/validate-date-range", methods=["POST"])
-def validate_date_range():
-    """API endpoint to validate date and time range for a timeframe."""
-    try:
-        data = request.get_json()
-        start_date = data.get("start_date")
-        end_date = data.get("end_date")
-        timeframe = data.get("timeframe")
-        start_time = data.get("start_time", "00:00")
-        end_time = data.get("end_time", "23:59")
-
-        if not all([start_date, end_date, timeframe]):
-            return jsonify({"error": "Missing required parameters"})
-
-        validation = analyzer.validate_date_range(
-            start_date, end_date, timeframe, start_time, end_time
-        )
-        return jsonify(validation)
-
-    except Exception as e:
-        return jsonify({"error": str(e)})
+        print(f"Error saving custom asset: {e}")
+        return jsonify({"success": False, "error": str(e)})
 
 
 @app.route("/api/update-provider", methods=["POST"])
 def update_provider():
-    """API endpoint to update LLM provider."""
+    """Update LLM provider."""
     try:
         data = request.get_json()
         provider = data.get("provider", "openai")
-
-        if provider not in ["openai", "anthropic", "qwen", "minimax"]:
-            return jsonify({"error": "Provider must be 'openai', 'anthropic', 'qwen', or 'minimax'"})
-
-        print(f"Updating provider to: {provider}")
-
-        # Update config in both analyzer and trading_graph
         analyzer.config["agent_llm_provider"] = provider
         analyzer.config["graph_llm_provider"] = provider
-        analyzer.trading_graph.config["agent_llm_provider"] = provider
-        analyzer.trading_graph.config["graph_llm_provider"] = provider
-        
-        # Update model names if switching providers
-        if provider == "anthropic":
-            # Set default Claude models if not already set to Anthropic models
-            if not analyzer.config["agent_llm_model"].startswith("claude"):
-                analyzer.config["agent_llm_model"] = "claude-haiku-4-5-20251001"
-            if not analyzer.config["graph_llm_model"].startswith("claude"):
-                analyzer.config["graph_llm_model"] = "claude-haiku-4-5-20251001"
-        elif provider == "qwen":
-            # Set default Qwen models if not already set to Qwen models
-            if not analyzer.config["agent_llm_model"].startswith("qwen"):
-                analyzer.config["agent_llm_model"] = "qwen3-max"
-            if not analyzer.config["graph_llm_model"].startswith("qwen"):
-                analyzer.config["graph_llm_model"] = "qwen3-vl-plus"
-        elif provider == "minimax":
-            # Set default MiniMax models if not already set to MiniMax models
-            if not analyzer.config["agent_llm_model"].startswith("MiniMax"):
-                analyzer.config["agent_llm_model"] = "MiniMax-M2.7"
-            if not analyzer.config["graph_llm_model"].startswith("MiniMax"):
-                analyzer.config["graph_llm_model"] = "MiniMax-M2.7"
-
-        else:
-            # Set default OpenAI models if not already set to OpenAI models
-            if analyzer.config["agent_llm_model"].startswith(("claude", "qwen", "MiniMax")):
-                analyzer.config["agent_llm_model"] = "gpt-4o-mini"
-            if analyzer.config["graph_llm_model"].startswith(("claude", "qwen", "MiniMax")):
-                analyzer.config["graph_llm_model"] = "gpt-4o"
-        
-        analyzer.trading_graph.config.update(analyzer.config)
-
-        # Refresh the trading graph with new provider
-        analyzer.trading_graph.refresh_llms()
-
-        print(f"Provider updated to {provider} successfully")
-        print(f"graph_llm_model updated to {analyzer.config['graph_llm_model']} successfully")
-        print(f"agent_llm updated to {analyzer.config['agent_llm_model']} successfully")
-        return jsonify({"success": True, "message": f"Provider updated to {provider}"})
-
+        return jsonify({"success": True, "provider": provider})
     except Exception as e:
-        print(f"Error in update_provider: {str(e)}")
-        return jsonify({"error": str(e)})
+        return jsonify({"success": False, "error": str(e)})
 
 
 @app.route("/api/update-api-key", methods=["POST"])
 def update_api_key():
-    """API endpoint to update API key for OpenAI or Anthropic."""
+    """Update API key for a provider."""
     try:
         data = request.get_json()
-        new_api_key = data.get("api_key")
-        provider = data.get("provider", "openai")  # Default to "openai" for backward compatibility
+        api_key = data.get("api_key", "").strip()
+        provider = data.get("provider", "openai")
 
-        if not new_api_key:
-            return jsonify({"error": "API key is required"})
+        if not api_key:
+            return jsonify({"success": False, "error": "No API key provided"})
 
-        if provider not in ["openai", "anthropic", "qwen", "minimax"]:
-            return jsonify({"error": "Provider must be 'openai', 'anthropic', 'qwen', or 'minimax'"})
-
-        print(f"Updating {provider} API key to: {new_api_key[:8]}...{new_api_key[-4:]}")
-
-        # Update the environment variable
-        if provider == "openai":
-            os.environ["OPENAI_API_KEY"] = new_api_key
-        elif provider == "anthropic":
-            os.environ["ANTHROPIC_API_KEY"] = new_api_key
-        elif provider == "qwen":
-            os.environ["DASHSCOPE_API_KEY"] = new_api_key
-        elif provider == "minimax":
-            os.environ["MINIMAX_API_KEY"] = new_api_key
-
-        # Update the API key in the trading graph
-        analyzer.trading_graph.update_api_key(new_api_key, provider=provider)
-
-        print(f"{provider} API key updated successfully")
-        return jsonify({"success": True, "message": f"{provider.capitalize()} API key updated successfully"})
-
+        analyzer.update_api_key(api_key, provider)
+        return jsonify({"success": True, "provider": provider})
     except Exception as e:
-        print(f"Error in update_api_key: {str(e)}")
-        return jsonify({"error": str(e)})
+        return jsonify({"success": False, "error": str(e)})
 
 
 @app.route("/api/get-api-key-status")
 def get_api_key_status():
-    """API endpoint to check if API key is set for a provider."""
+    """Return masked API key status for a provider."""
     try:
         provider = request.args.get("provider", "openai")
-        
-        # First check environment variables
-        if provider == "openai":
-            api_key = os.environ.get("OPENAI_API_KEY", "")
-            # Fallback to config if not in environment
-            if not api_key and hasattr(analyzer, 'config'):
-                api_key = analyzer.config.get("api_key", "")
-        elif provider == "anthropic":
-            api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-            # Fallback to config if not in environment
-            if not api_key and hasattr(analyzer, 'config'):
-                api_key = analyzer.config.get("anthropic_api_key", "")
-        elif provider == "qwen":
-            api_key = os.environ.get("DASHSCOPE_API_KEY", "")
-            # Fallback to config if not in environment
-            if not api_key and hasattr(analyzer, 'config'):
-                api_key = analyzer.config.get("qwen_api_key", "")
-        elif provider == "minimax":
-            api_key = os.environ.get("MINIMAX_API_KEY", "")
-            # Fallback to config if not in environment
-            if not api_key and hasattr(analyzer, 'config'):
-                api_key = analyzer.config.get("minimax_api_key", "")
-        else:
-            api_key = ""
-        
-        if api_key and api_key != "your-openai-api-key-here" and api_key != "":
-            # Return masked version for security
-            masked_key = (
-                api_key[:3] + "..." + api_key[-3:] if len(api_key) > 12 else "***"
-            )
-            return jsonify({"has_key": True, "masked_key": masked_key})
-        else:
-            return jsonify({"has_key": False})
+        key_map = {
+            "openai": "api_key",
+            "anthropic": "anthropic_api_key",
+            "qwen": "qwen_api_key",
+            "minimax": "minimax_api_key",
+        }
+        key_name = key_map.get(provider, "api_key")
+        api_key = analyzer.config.get(key_name, "")
+
+        if api_key and api_key not in ("sk-", ""):
+            masked = api_key[:4] + "..." + api_key[-4:] if len(api_key) > 8 else "***"
+            return jsonify({"has_key": True, "masked_key": masked})
+        return jsonify({"has_key": False})
     except Exception as e:
-        print(f"Error in get_api_key_status: {str(e)}")
-        import traceback
-        traceback.print_exc()
         return jsonify({"error": str(e), "has_key": False})
 
 
-@app.route("/api/images/<image_type>")
-def get_image(image_type):
-    """API endpoint to serve generated images."""
-    try:
-        if image_type == "pattern":
-            image_path = "kline_chart.png"
-        elif image_type == "trend":
-            image_path = "trend_graph.png"
-        elif image_type == "pattern_chart":
-            image_path = "pattern_chart.png"
-        elif image_type == "trend_chart":
-            image_path = "trend_chart.png"
-        else:
-            return jsonify({"error": "Invalid image type"})
-
-        if not os.path.exists(image_path):
-            return jsonify({"error": "Image not found"})
-
-        return send_file(image_path, mimetype="image/png")
-
-    except Exception as e:
-        return jsonify({"error": str(e)})
-
-
-@app.route("/api/validate-api-key", methods=["POST"])
-def validate_api_key():
-    """API endpoint to validate the current API key."""
-    try:
-        data = request.get_json() or {}
-        provider = data.get("provider") or analyzer.config.get("agent_llm_provider", "openai")
-        validation = analyzer.validate_api_key(provider=provider)
-        return jsonify(validation)
-    except Exception as e:
-        return jsonify({"valid": False, "error": str(e)})
-
-
-@app.route("/assets/<path:filename>")
-def serve_assets(filename):
-    """Serve static assets from the assets folder."""
-    try:
-        return send_file(f"assets/{filename}")
-    except FileNotFoundError:
-        return jsonify({"error": "Asset not found"}), 404
-
-
 if __name__ == "__main__":
-    # Create templates directory if it doesn't exist
-    templates_dir = Path("templates")
-    templates_dir.mkdir(exist_ok=True)
-
-    # Create static directory if it doesn't exist
-    static_dir = Path("static")
-    static_dir.mkdir(exist_ok=True)
-
+    Path("templates").mkdir(exist_ok=True)
+    Path("static").mkdir(exist_ok=True)
     app.run(debug=True, host="127.0.0.1", port=5000)

@@ -784,6 +784,65 @@
              opacity: 0.8;
              animation: glow 2s ease-in-out infinite alternate;
          }
+         /* Data Source Selector Styles */
+         .data-source-selector {
+             display: flex;
+             background: var(--gray-100);
+             border-radius: 12px;
+             gap: 0.5rem;
+             padding: 0.5rem;
+         }
+
+         .data-source-btn {
+             flex: 1;
+             background: transparent;
+             border: none;
+             border-radius: 8px;
+             padding: 12px 16px;
+             font-size: 0.95rem;
+             font-weight: 500;
+             color: var(--gray-700);
+             transition: all 0.2s ease;
+             display: flex;
+             align-items: center;
+             gap: 0.5rem;
+         }
+
+         .data-source-btn:hover {
+             background: rgba(86, 39, 216, 0.1);
+             color: var(--etrade-purple);
+             transform: translateY(-1px);
+         }
+
+         .data-source-btn.active {
+             background: var(--etrade-purple-light);
+             color: var(--white);
+             box-shadow: 0 4px 12px rgba(86, 39, 216, 0.3);
+             transform: translateY(-1px);
+         }
+
+         /* Mobile responsive */
+         @media (max-width: 768px) {
+             .data-source-selector {
+                 overflow-x: auto;
+                 scrollbar-width: none;
+                 -ms-overflow-style: none;
+             }
+
+             .data-source-selector::-webkit-scrollbar {
+                 display: none;
+             }
+
+             .data-source-btn {
+                 flex-shrink: 0;
+                 min-width: 80px;
+                 padding: 10px 12px;
+                 font-size: 0.85rem;
+             }
+         }
+
+         /* Banner Image Styles */
+
          
          @keyframes glow {
              from {
@@ -890,20 +949,20 @@
                                         
                                     </div>
                                     <div style="display: flex; align-items: center; justify-content: center; gap: 0rem; margin-bottom: 0.5rem;">
-                                        <img src="assets/darklogo.png" alt="QuantAgent Logo" style="width: 7rem; height: 7rem; object-fit: contain; background: transparent; box-shadow: none; border: none; border-radius: 0; transform: translateY(0.5rem);">
+                                        <img src="/static/assets/darklogo.png" alt="QuantAgent Logo" style="width: 7rem; height: 7rem; object-fit: contain; background: transparent; box-shadow: none; border: none; border-radius: 0; transform: translateY(0.5rem);">
                                         <span style="font-size: 4.0rem; font-weight: 700; color: white; line-height: 1.0;">QuantAgent:</span>
                                     </div>
                                     <div class="text-center">
-                                        <span class="title-highlight">Multi-Agent Trading System</span>
+                                        <span class="title-highlight">多智能体交易系统</span>
                                     </div>
                                 </h1>
-                                <p class="text-lg text-white mb-8" style="font-size: 1.3rem; margin-top: 1.5rem;">Advanced multi-agent system combining technical indicators, pattern recognition, and trend analysis for comprehensive market insights.</p>
+                                <p class="text-lg text-white mb-8" style="font-size: 1.3rem; margin-top: 1.5rem;">结合技术指标、形态识别和趋势分析的多智能体系统，提供全面的市场洞察。</p>
 
                                 <!-- Buttons -->
                                 <div class="max-w-xs mx-auto sm:max-w-none sm:flex sm:justify-center mb-12 md:mb-0">
                                     <div>
                                         <a class="hero-btn" href="#analysis">
-                                            <span class="hero-btn-text">Start Analysis</span>
+                                            <span class="hero-btn-text">开始分析</span>
                                             <span class="hero-btn-icon">
                                                 <i class="fas fa-arrow-right"></i>
                                             </span>
@@ -931,88 +990,115 @@
                     <!-- Analysis Form -->
                     <div class="form-section">
                         <h3 style="text-align: center; font-size: 1.6rem; font-weight: 600; color: var(--etrade-purple); margin-bottom: 2rem; display: flex; align-items: center; justify-content: center; gap: 0.75rem;">
-                            <i class="fas fa-cog" style="font-size: 1.5rem; color: var(--etrade-purple-light);"></i> Analysis Configuration
+                            <i class="fas fa-cog" style="font-size: 1.5rem; color: var(--etrade-purple-light);"></i> 分析配置
                         </h3>
                         
                         <!-- Panel 1: Data Selection -->
                         <div class="panel-group">
                             <div class="panel">
                                 <h4 class="panel-title">
-                                    <i class="fas fa-database"></i> Data Selection
+                                    <i class="fas fa-database"></i> 数据选择
                                 </h4>
                                 
                                 <!-- Asset Selection -->
                                 <div class="form-group">
                                     <label class="form-label">
-                                        <i class="fas fa-coins"></i> Asset
+                                        <i class="fas fa-coins"></i> 资产
                                     </label>
                                     <div class="asset-button-grid" id="assetButtonGrid">
-                                        <button type="button" class="asset-btn" data-asset="BTC" onclick="selectAsset(this, 'BTC')">
-                                            <i class="fas fa-bitcoin"></i> BTC
+                                        <!-- 中国A股 -->
+                                        <button type="button" class="asset-btn" data-asset="000001" onclick="selectAsset(this, '000001')">
+                                            <i class="fas fa-landmark"></i> 000001
                                         </button>
-                                        <button type="button" class="asset-btn" data-asset="ETH" onclick="selectAsset(this, 'ETH')">
-                                            <i class="fab fa-ethereum"></i> ETH
+                                        <button type="button" class="asset-btn" data-asset="600519" onclick="selectAsset(this, '600519')">
+                                            <i class="fas fa-landmark"></i> 600519
                                         </button>
-                                        <button type="button" class="asset-btn" data-asset="AAPL" onclick="selectAsset(this, 'AAPL')">
-                                            <i class="fas fa-apple-alt"></i> AAPL
+                                        <button type="button" class="asset-btn" data-asset="601318" onclick="selectAsset(this, '601318')">
+                                            <i class="fas fa-landmark"></i> 601318
                                         </button>
-                                        <button type="button" class="asset-btn" data-asset="GOOGL" onclick="selectAsset(this, 'GOOGL')">
-                                            <i class="fab fa-google"></i> GOOGL
+                                        <button type="button" class="asset-btn" data-asset="300750" onclick="selectAsset(this, '300750')">
+                                            <i class="fas fa-landmark"></i> 300750
                                         </button>
-                                        <button type="button" class="asset-btn" data-asset="MSFT" onclick="selectAsset(this, 'MSFT')">
-                                            <i class="fab fa-microsoft"></i> MSFT
+                                        <!-- 中国指数 -->
+                                        <button type="button" class="asset-btn" data-asset="SH000001" onclick="selectAsset(this, 'SH000001')">
+                                            <i class="fas fa-chart-area"></i> 上证指数
                                         </button>
-                                        <button type="button" class="asset-btn" data-asset="TSLA" onclick="selectAsset(this, 'TSLA')">
-                                            <i class="fas fa-car"></i> TSLA
+                                        <button type="button" class="asset-btn" data-asset="SZ399001" onclick="selectAsset(this, 'SZ399001')">
+                                            <i class="fas fa-chart-area"></i> 深证成指
+                                        </button>
+                                        <button type="button" class="asset-btn" data-asset="SZ399006" onclick="selectAsset(this, 'SZ399006')">
+                                            <i class="fas fa-chart-area"></i> 创业板指
+                                        </button>
+                                        <button type="button" class="asset-btn" data-asset="SH000300" onclick="selectAsset(this, 'SH000300')">
+                                            <i class="fas fa-chart-area"></i> 沪深300
                                         </button>
                                         <button type="button" class="asset-btn custom-asset-btn" id="customAssetBtn" onclick="showCustomAssetInput()">
-                                            <i class="fas fa-plus"></i> Custom
+                                            <i class="fas fa-plus"></i> 自定义
                                         </button>
                                     </div>
                                     
                                     <!-- Custom Asset Input -->
                                     <div id="customAssetDiv" class="mt-3" style="display: none;">
                                         <div class="alert alert-info">
-                                            <h6><i class="fas fa-plus-circle"></i> Custom Asset Symbol</h6>
-                                            <p class="mb-2"><strong>💡 Examples:</strong> NQ (Nasdaq-100 Futures), ZN (10-Year Treasury), etc.</p>
-                                            <p class="mb-0"><strong>📝 Format:</strong> Enter the Yahoo Finance symbol for your asset</p>
+                                            <h6><i class="fas fa-plus-circle"></i> 自定义资产代码</h6>
+                                            <p class="mb-2"><strong>💡 示例：</strong>000001（平安银行）、600000（浦发银行）</p>
+                                            <p class="mb-0"><strong>📝 格式：</strong>输入 A 股股票代码（6 位数字代码）</p>
                                         </div>
                                         <div class="input-group">
-                                            <input type="text" class="form-control" id="customAssetInput" placeholder="Enter symbol (e.g., NQ=F, ZN=F, ^VIX)">
+                                            <input type="text" class="form-control" id="customAssetInput" placeholder="输入股票代码（如：000001, 600000, SH000001）">
                                             <button class="btn btn-outline-primary" type="button" onclick="confirmCustomAsset()">
-                                                <i class="fas fa-check"></i> Confirm
+                                                <i class="fas fa-check"></i> 确认
                                             </button>
                                         </div>
-                                        <small class="form-text text-muted">Use Yahoo Finance symbols. For futures, add =F suffix (e.g., NQ=F)</small>
+                                        <small class="form-text text-muted">输入 A 股代码（6 位数字）或指数代码（如 SH000001、SZ399001）</small>
                                     </div>
                                 </div>
+                                    <!-- Data Source Selection -->
+                                    <div class="form-group">
+                                        <label class="form-label">
+                                            <i class="fas fa-server"></i> 数据源
+                                        </label>
+                                        <div class="data-source-selector">
+                                            <button type="button" class="data-source-btn active" data-source="akshare" onclick="selectDataSource(this, 'akshare')">
+                                                <i class="fas fa-globe"></i> AKShare
+                                            </button>
+                                            <button type="button" class="data-source-btn" data-source="live" onclick="selectDataSource(this, 'live')">
+                                                <i class="fab fa-yahoo"></i> Yahoo Finance
+                                            </button>
+                                            <button type="button" class="data-source-btn" data-source="qlib" onclick="selectDataSource(this, 'qlib')">
+                                                <i class="fas fa-database"></i> Qlib (Local A-Share)
+                                            </button>
+                                        </div>
+                                        <small class="form-text text-muted">
+                                            <strong>AKShare:</strong> A股、指数、ETF分钟数据、美股（免费，推荐）<br>
+                                            <strong>Yahoo Finance:</strong> 实时数据，有限流<br>
+                                            <strong>Qlib:</strong> A股本地数据，无限制
+                                        </small>
+                                    </div>
                                 
                                 <!-- Timeframe Selection -->
                                 <div class="form-group">
                                     <label class="form-label">
-                                        <i class="fas fa-chart-line"></i> Timeframe
+                                        <i class="fas fa-chart-line"></i> 时间周期
                                     </label>
                                     <div class="timeframe-selector">
                                         <button type="button" class="timeframe-btn" data-timeframe="1m" onclick="selectTimeframe(this, '1m')">
                                             1m
                                         </button>
+                                        <button type="button" class="timeframe-btn" data-timeframe="5m" onclick="selectTimeframe(this, '5m')">
+                                            5m
+                                        </button>
                                         <button type="button" class="timeframe-btn" data-timeframe="15m" onclick="selectTimeframe(this, '15m')">
                                             15m
+                                        </button>
+                                        <button type="button" class="timeframe-btn" data-timeframe="30m" onclick="selectTimeframe(this, '30m')">
+                                            30m
                                         </button>
                                         <button type="button" class="timeframe-btn" data-timeframe="1h" onclick="selectTimeframe(this, '1h')">
                                             1h
                                         </button>
-                                        <button type="button" class="timeframe-btn" data-timeframe="4h" onclick="selectTimeframe(this, '4h')">
-                                            4h
-                                        </button>
-                                        <button type="button" class="timeframe-btn" data-timeframe="1d" onclick="selectTimeframe(this, '1d')">
+                                        <button type="button" class="timeframe-btn active" data-timeframe="1d" onclick="selectTimeframe(this, '1d')">
                                             1d
-                                        </button>
-                                        <button type="button" class="timeframe-btn" data-timeframe="1w" onclick="selectTimeframe(this, '1w')">
-                                            1w
-                                        </button>
-                                        <button type="button" class="timeframe-btn" data-timeframe="1mo" onclick="selectTimeframe(this, '1mo')">
-                                            1mo
                                         </button>
                                     </div>
                                 </div>
@@ -1021,20 +1107,20 @@
                             <!-- Panel 2: Date & Time Configuration -->
                             <div class="panel">
                                 <h4 class="panel-title">
-                                    <i class="fas fa-calendar-alt"></i> Date & Time Configuration
+                                    <i class="fas fa-calendar-alt"></i> 日期与时间
                                 </h4>
                                 
                                 <!-- Date Range -->
                                 <div class="form-group">
                                     <label class="form-label" style="font-size: 1.2rem; font-weight: 600; color: #374151; margin-bottom: 0.75rem;">
-                                        <i class="fas fa-calendar-week" style="color: #6B7280; margin-right: 0.5rem;"></i> Date Range
+                                        <i class="fas fa-calendar-week" style="color: #6B7280; margin-right: 0.5rem;"></i> 日期范围
                                     </label>
                                     <div class="row">
                                         <div class="col-md-6">
-                                            <input type="date" id="startDate" class="form-control" placeholder="mm/dd/yyyy" required style="font-size: 1.1rem; padding: 0.875rem 1rem; border: 2px solid #E5E7EB; border-radius: 8px;">
+                                            <input type="date" id="startDate" class="form-control" placeholder="年/月/日" required style="font-size: 1.1rem; padding: 0.875rem 1rem; border: 2px solid #E5E7EB; border-radius: 8px;">
                                         </div>
                                         <div class="col-md-6">
-                                            <input type="date" id="endDate" class="form-control" placeholder="mm/dd/yyyy" required style="font-size: 1.1rem; padding: 0.875rem 1rem; border: 2px solid #E5E7EB; border-radius: 8px;">
+                                            <input type="date" id="endDate" class="form-control" placeholder="年/月/日" required style="font-size: 1.1rem; padding: 0.875rem 1rem; border: 2px solid #E5E7EB; border-radius: 8px;">
                                         </div>
                                     </div>
                                 </div>
@@ -1042,7 +1128,7 @@
                                 <!-- Time Selector -->
                                 <div class="form-group">
                                     <label class="form-label" style="font-size: 1.2rem; font-weight: 600; color: #374151; margin-bottom: 0.75rem;">
-                                        <i class="fas fa-clock" style="color: #6B7280; margin-right: 0.5rem;"></i> Time Selector
+                                        <i class="fas fa-clock" style="color: #6B7280; margin-right: 0.5rem;"></i> 时间选择
                                     </label>
                                     <div class="row">
                                         <div class="col-md-6">
@@ -1059,7 +1145,7 @@
                                     <div class="form-check" style="margin-top: 1rem;">
                                         <input class="form-check-input" type="checkbox" id="useCurrentTime" checked style="transform: scale(1.2); margin-right: 0.75rem;">
                                         <label class="form-check-label" for="useCurrentTime" style="font-size: 1.3rem; font-weight: 500; color: #374151; cursor: pointer;">
-                                            Use current date & time for end
+                                            使用当前日期和时间
                                         </label>
                                     </div>
                                 </div>
@@ -1081,60 +1167,60 @@
                         <div class="panel-group">
                             <div class="panel">
                                 <h4 class="panel-title">
-                                    <i class="fas fa-cog"></i> Settings
+                                    <i class="fas fa-cog"></i> 设置
                                 </h4>
                                 
                                 <!-- LLM Provider Selection -->
                                 <div class="form-group">
-                                    <label class="form-label">LLM Provider</label>
+                                    <label class="form-label">AI 模型提供商</label>
                                     <select class="form-control" id="llmProviderSelect" onchange="handleProviderChange()">
                                         <option value="openai" selected>OpenAI</option>
                                         <option value="anthropic">Claude (Anthropic)</option>
-                                        <option value="qwen">Qwen</option>
+                                        <option value="qwen">通义千问 (Qwen)</option>
                                         <option value="minimax">MiniMax</option>
                                     </select>
                                 </div>
                                 
                                 <!-- OpenAI API Key Input -->
                                 <div class="form-group" id="openaiApiKeyGroup">
-                                    <label class="form-label">OpenAI API Key</label>
+                                    <label class="form-label">OpenAI API 密钥</label>
                                     <div class="input-group">
-                                        <input type="password" class="form-control" id="openaiApiKeyInput" placeholder="Enter your OpenAI API key">
+                                        <input type="password" class="form-control" id="openaiApiKeyInput" placeholder="输入您的 OpenAI API 密钥">
                                         <button class="btn btn-outline-primary" type="button" onclick="updateApiKey('openai')">
-                                            <i class="fas fa-save"></i> Update
+                                            <i class="fas fa-save"></i> 更新
                                         </button>
                                     </div>
                                 </div>
                                 
                                 <!-- Anthropic API Key Input -->
                                 <div class="form-group" id="anthropicApiKeyGroup" style="display: none;">
-                                    <label class="form-label">Anthropic API Key</label>
+                                    <label class="form-label">Anthropic API 密钥</label>
                                     <div class="input-group">
-                                        <input type="password" class="form-control" id="anthropicApiKeyInput" placeholder="Enter your Anthropic API key">
+                                        <input type="password" class="form-control" id="anthropicApiKeyInput" placeholder="输入您的 Anthropic API 密钥">
                                         <button class="btn btn-outline-primary" type="button" onclick="updateApiKey('anthropic')">
-                                            <i class="fas fa-save"></i> Update
+                                            <i class="fas fa-save"></i> 更新
                                         </button>
                                     </div>
                                 </div>
                                 
                                 <!-- Qwen API Key Input -->
                                 <div class="form-group" id="qwenApiKeyGroup" style="display: none;">
-                                    <label class="form-label">Qwen API Key (Dashscope)</label>
+                                    <label class="form-label">Qwen API 密钥（Dashscope）</label>
                                     <div class="input-group">
-                                        <input type="password" class="form-control" id="qwenApiKeyInput" placeholder="Enter your Qwen API key">
+                                        <input type="password" class="form-control" id="qwenApiKeyInput" placeholder="输入您的 Qwen API 密钥（Dashscope）">
                                         <button class="btn btn-outline-primary" type="button" onclick="updateApiKey('qwen')">
-                                            <i class="fas fa-save"></i> Update
+                                            <i class="fas fa-save"></i> 更新
                                         </button>
                                     </div>
                                 </div>
 
                                 <!-- MiniMax API Key Input -->
                                 <div class="form-group" id="minimaxApiKeyGroup" style="display: none;">
-                                    <label class="form-label">MiniMax API Key</label>
+                                    <label class="form-label">MiniMax API 密钥</label>
                                     <div class="input-group">
-                                        <input type="password" class="form-control" id="minimaxApiKeyInput" placeholder="Enter your MiniMax API key">
+                                        <input type="password" class="form-control" id="minimaxApiKeyInput" placeholder="输入您的 MiniMax API 密钥">
                                         <button class="btn btn-outline-primary" type="button" onclick="updateApiKey('minimax')">
-                                            <i class="fas fa-save"></i> Update
+                                            <i class="fas fa-save"></i> 更新
                                         </button>
                                     </div>
                                 </div>
@@ -1157,31 +1243,31 @@
                             <!-- Security Information Panel -->
                             <div class="panel security-panel">
                                 <h4 class="panel-title">
-                                    <i class="fas fa-shield-alt"></i> Security Information
+                                    <i class="fas fa-shield-alt"></i> 安全信息
                                 </h4>
                                 
                                 <div class="security-info">
                                     <div class="security-item">
                                         <i class="fas fa-server security-icon"></i>
                                         <div class="security-content">
-                                            <strong>Localhost Only</strong>
-                                            <p>This server runs exclusively on localhost (127.0.0.1)</p>
+                                            <strong>仅本地访问</strong>
+                                            <p>本服务器仅在本地回环地址运行（127.0.0.1）</p>
                                         </div>
                                     </div>
                                     
                                     <div class="security-item">
                                         <i class="fas fa-key security-icon"></i>
                                         <div class="security-content">
-                                            <strong>API Key Security</strong>
-                                            <p>Your API key is stored locally and never uploaded to external servers</p>
+                                            <strong>API 密钥安全</strong>
+                                            <p>您的 API 密钥仅存储在本地，不会上传到外部服务器</p>
                                         </div>
                                     </div>
                                     
                                     <div class="security-item">
                                         <i class="fas fa-shield-alt security-icon"></i>
                                         <div class="security-content">
-                                            <strong>Data Privacy</strong>
-                                            <p>All analysis data remains on your local machine</p>
+                                            <strong>数据隐私</strong>
+                                            <p>所有分析数据均保留在您的本地计算机上</p>
                                         </div>
                                     </div>
                                 </div>
@@ -1191,7 +1277,7 @@
                         <!-- Run Analysis Button -->
                         <div class="text-center" style="margin-top: 2rem;">
                             <button class="btn btn-primary btn-lg" id="analyzeBtn" onclick="runAnalysis()" style="padding: 1.5rem 3rem; font-size: 1.3rem; border-radius: 15px;">
-                                <i class="fas fa-play"></i> Run Analysis
+                                <i class="fas fa-play"></i> 开始分析
                             </button>
                         </div>
                     </div>
@@ -1287,7 +1373,7 @@
             const customAsset = customAssetEl.value.trim();
 
             if (!customAsset) {
-                alert('Please enter a custom asset symbol.');
+                alert('请输入自定义资产代码。');
                 return;
             }
 
@@ -1364,6 +1450,45 @@
 
             console.log('Selected asset:', asset);
         }
+        // Data source selection
+        let selectedDataSource = 'akshare'; // Default to AKShare
+
+        function selectDataSource(button, dataSource) {
+            // Remove active class from all data source buttons
+            document.querySelectorAll('.data-source-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            // Add active class to clicked button
+            button.classList.add('active');
+            selectedDataSource = dataSource;
+
+            // Save selection
+            localStorage.setItem(STORAGE_KEYS.SELECTED_DATA_SOURCE, dataSource);
+
+            // Update placeholder text based on data source
+            updateAssetPlaceholder(dataSource);
+        }
+
+        function updateAssetPlaceholder(dataSource) {
+            const customAssetInput = document.getElementById('customAssetInput');
+            const customAssetText = document.querySelector('#customAssetDiv .alert-info p:last-child');
+
+            if (customAssetInput && customAssetText) {
+                if (dataSource === 'akshare') {
+                    customAssetInput.placeholder = '输入股票代码（如：000001, 600000, SZ399006）';
+                    customAssetText.innerHTML = '<strong>💡 示例：</strong>000001 (平安银行), 600000 (浦发银行), SZ399006 (创业板指)<br><strong>📝 格式：</strong>A股代码或指数代码';
+                } else if (dataSource === 'qlib') {
+                    customAssetInput.placeholder = '输入Qlib股票代码（如：sh600000, sz000001）';
+                    customAssetText.innerHTML = '<strong>💡 示例：</strong>sh600000 (浦发银行), sz000001 (平安银行), sh000300 (沪深300)<br><strong>📝 格式：</strong>前缀+代码（sh/sz + 数字）';
+                } else {
+                    customAssetInput.placeholder = '输入Yahoo Finance符号（如：NQ=F, ZN=F, ^VIX）';
+                    customAssetText.innerHTML = '<strong>💡 示例：</strong>NQ (纳斯达克100期货), ZN (10年期国债) 等<br><strong>📝 格式：</strong>输入Yahoo Finance交易代码';
+                }
+            }
+        }
+
+
 
         // Persist timeframe selection as well
         function selectTimeframe(button, timeframe) {
@@ -1422,6 +1547,19 @@
                 }
             } catch (e) {
                 console.warn('Could not restore timeframe from localStorage', e);
+            }
+
+            // Restore selected data source (if saved)
+            try {
+                const savedDS = localStorage.getItem(STORAGE_KEYS.SELECTED_DATA_SOURCE);
+                if (savedDS) {
+                    const dsBtn = Array.from(document.querySelectorAll('.data-source-btn')).find(b => b.dataset.source === savedDS);
+                    if (dsBtn) {
+                        dsBtn.click();
+                    }
+                }
+            } catch (e) {
+                console.error('Error restoring data source selection:', e);
             }
 
             // Restore selected asset (if saved). If it is a custom asset that hasn't been added yet,
@@ -1516,12 +1654,12 @@
                         console.error('API key status error:', data.error);
                         // Don't show error if it's just that no key is set
                         if (data.has_key === false) {
-                            showApiKeyError(`No ${providerName} API key found. Please enter your ${providerName} API key.`);
+                            showApiKeyError(`未找到 ${providerName} API 密钥，请输入您的 ${providerName} API 密钥。`);
                         } else {
-                            showApiKeyError(`Error checking API key: ${data.error}`);
+                            showApiKeyError(`API 密钥检查出错：${data.error}`);
                         }
                     } else if (data.has_key) {
-                        showApiKeyStatus(`${providerName} API key is set: ${data.masked_key}`);
+                        showApiKeyStatus(`${providerName} API 密钥已设置：${data.masked_key}`);
                     } else {
                         showApiKeyError(`No ${providerName} API key found. Please enter your ${providerName} API key.`);
                     }
@@ -1579,7 +1717,7 @@
              const customAsset = customAssetEl.value.trim();
 
              if (!customAsset) {
-                 alert('Please enter a custom asset symbol.');
+                 alert('请输入自定义资产代码。');
                  return;
              }
 
@@ -1633,7 +1771,7 @@
          }
         
                  function runAnalysis() {
-             const dataSource = 'live'; // Always use live data
+             const dataSource = selectedDataSource; // Use selected data source
              const timeframe = selectedTimeframe;
              
              // Get asset value from selected asset
@@ -1641,7 +1779,7 @@
              
              // Validate inputs
              if (!asset || !timeframe) {
-                 alert('Please select both asset and timeframe.');
+                 alert('请选择资产和时间周期。');
                  return;
              }
              
@@ -1654,14 +1792,14 @@
              
              // Validate dates
              if (!startDate || !endDate) {
-                 alert('Please select both start and end dates.');
+                 alert('请选择开始日期和结束日期。');
                  return;
              }
              
              // Show loading state
              const analyzeBtn = document.getElementById('analyzeBtn');
              const originalText = analyzeBtn.innerHTML;
-             analyzeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyzing...';
+             analyzeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 分析中...';
              analyzeBtn.disabled = true;
              
              // Prepare request data
@@ -1696,14 +1834,14 @@
                     window.location.href = data.redirect;
                  } else if (data.error) {
                      // Show error message
-                     alert('Analysis failed: ' + data.error);
+                     alert('分析失败：' + data.error);
                      // Reset button
                      analyzeBtn.innerHTML = originalText;
                      analyzeBtn.disabled = false;
                  } else {
                      // Handle other responses
                      console.log('Analysis completed:', data);
-                     alert('Analysis completed successfully!');
+                     alert('分析成功完成！');
                      // Reset button
                      analyzeBtn.innerHTML = originalText;
                      analyzeBtn.disabled = false;
@@ -1711,7 +1849,7 @@
              })
              .catch(error => {
                  console.error('Error:', error);
-                 alert('An error occurred during analysis. Please try again.');
+                 alert('分析过程中发生错误，请重试。');
                  // Reset button
                  analyzeBtn.innerHTML = originalText;
                  analyzeBtn.disabled = false;
@@ -1739,8 +1877,8 @@
                 endTimeInput.value = currentTime;
                 
                 // Add visual indication
-                endDateInput.title = 'Locked: Using current date/time';
-                endTimeInput.title = 'Locked: Using current date/time';
+                endDateInput.title = '已锁定：使用当前日期/时间';
+                endTimeInput.title = '已锁定：使用当前日期/时间';
             } else {
                 // Unlock both inputs
                 endTimeInput.disabled = false;
@@ -1773,7 +1911,7 @@
             
             if (startDate && endDate && startDate > endDate) {
                 document.getElementById('dateRangeError').style.display = 'block';
-                document.getElementById('dateRangeErrorText').textContent = 'Start date cannot be after end date';
+                document.getElementById('dateRangeErrorText').textContent = '开始日期不能晚于结束日期';
             } else {
                 document.getElementById('dateRangeError').style.display = 'none';
             }
@@ -1861,7 +1999,7 @@
              }
              
              if (!apiKey) {
-                 showApiKeyError('Please enter an API key');
+                 showApiKeyError('请输入 API 密钥');
                  return;
              }
              
@@ -1871,7 +2009,7 @@
              // Show loading state
              const updateBtn = event.target.closest('button');
              const originalText = updateBtn.innerHTML;
-             updateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating...';
+             updateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 更新中...';
              updateBtn.disabled = true;
              
              // Make API call to update the key
@@ -1894,7 +2032,7 @@
                          'qwen': 'Qwen',
                          'minimax': 'MiniMax'
                      };
-                     showApiKeySuccess(`${providerNames[actualProvider] || actualProvider} API key updated successfully!`);
+                     showApiKeySuccess(`${providerNames[actualProvider] || actualProvider} API 密钥更新成功！`);
                      if (actualProvider === 'openai') {
                          document.getElementById('openaiApiKeyInput').value = '';
                      } else if (actualProvider === 'anthropic') {
@@ -1906,12 +2044,12 @@
                      }
                      checkApiKeyStatus();
                  } else {
-                     showApiKeyError(data.error || 'Failed to update API key');
+                     showApiKeyError(data.error || 'API 密钥更新失败');
                  }
              })
              .catch(error => {
                  console.error('Error:', error);
-                 showApiKeyError('An error occurred while updating the API key');
+                 showApiKeyError('API 密钥更新时发生错误');
              })
              .finally(() => {
                  // Reset button

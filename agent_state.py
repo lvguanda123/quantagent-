@@ -65,3 +65,21 @@ class IndicatorAgentState(TypedDict):
     final_trade_decision: Annotated[
         str, "Final BUY or SELL decision made after analyzing indicators"
     ]
+    entry_price: Annotated[
+        float, "Recommended entry price based on current price and support/resistance levels"
+    ]
+    stop_loss: Annotated[
+        float, "Stop-loss price to limit downside risk"
+    ]
+    take_profit: Annotated[
+        float, "Take-profit price for target exit"
+    ]
+    risk_reward_ratio: Annotated[
+        float, "Risk-reward ratio for the trade"
+    ]
+    justification: Annotated[
+        str, "Concise reasoning for the trade decision"
+    ]
+    forecast_horizon: Annotated[
+        str, "Predicted time horizon for the trade"
+    ]

@@ -15,13 +15,17 @@ from trend_agent import create_trend_agent
 class SetGraph:
     def __init__(
         self,
-        agent_llm: ChatOpenAI,
-        graph_llm: ChatOpenAI,
+        agent_llm: ChatOpenAI,      # Indicator Agent
+        pattern_llm: ChatOpenAI,     # Pattern Agent
+        trend_llm: ChatOpenAI,      # Trend Agent
+        decision_llm: ChatOpenAI,   # Decision Agent
         toolkit: TechnicalTools,
         # tool_nodes: Dict[str, ToolNode],
     ):
         self.agent_llm = agent_llm
-        self.graph_llm = graph_llm
+        self.pattern_llm = pattern_llm
+        self.trend_llm = trend_llm
+        self.decision_llm = decision_llm
         self.toolkit = toolkit
         # self.tool_nodes = tool_nodes
 
@@ -31,24 +35,24 @@ class SetGraph:
         tool_nodes = {}
         all_agents = ["indicator", "pattern", "trend"]
 
-        # create nodes for indicator agent
-        agent_nodes["indicator"] = create_indicator_agent(self.graph_llm, self.toolkit)
+        # create nodes for indicator agent (uses agent_llm for indicator calculations)
+        agent_nodes["indicator"] = create_indicator_agent(self.agent_llm, self.toolkit)
         # tool_nodes["indicator"] = self.tool_nodes["indicator"]
 
-        # create nodes for pattern agent
+        # create nodes for pattern agent (uses agent_llm + graph_llm for vision)
         agent_nodes["pattern"] = create_pattern_agent(
-            self.agent_llm, self.graph_llm, self.toolkit
+            self.agent_llm, self.pattern_llm, self.toolkit
         )
         # tool_nodes["pattern"] = self.tool_nodes["pattern"]
 
-        # create nodes for trend agent
+        # create nodes for trend agent (uses agent_llm + graph_llm for vision)
         agent_nodes["trend"] = create_trend_agent(
-            self.agent_llm, self.graph_llm, self.toolkit
+            self.agent_llm, self.trend_llm, self.toolkit
         )
         # tool_nodes["trend"] = self.tool_nodes["trend"]
 
-        # create nodes for decision agent
-        decision_agent_node = create_final_trade_decider(self.graph_llm)
+        # create nodes for decision agent (uses decision_llm for final decision)
+        decision_agent_node = create_final_trade_decider(self.decision_llm)
 
         # create graph
         graph = StateGraph(IndicatorAgentState)

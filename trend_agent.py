@@ -11,6 +11,16 @@ from openai import RateLimitError
 
 
 # --- Retry wrapper for LLM invocation ---
+def _ensure_dict_args(args):
+    """Ensure tool call args is a dict, parsing from JSON string if needed."""
+    if isinstance(args, str):
+        try:
+            return json.loads(args)
+        except (json.JSONDecodeError, TypeError):
+            return {}
+    return args
+
+
 def invoke_with_retry(call_fn, *args, retries=3, wait_sec=4):
     """
     Retry a function call with exponential backoff for rate limits or errors.
@@ -80,7 +90,7 @@ def create_trend_agent(tool_llm, graph_llm, toolkit):
             if hasattr(ai_response, "tool_calls"):
                 for call in ai_response.tool_calls:
                     tool_name = call["name"]
-                    tool_args = call["args"]
+                    tool_args = _ensure_dict_args(call.get("args", {}))
                     # Always provide kline_data
                     import copy
 
@@ -105,7 +115,9 @@ def create_trend_agent(tool_llm, graph_llm, toolkit):
                         f"This candlestick ({time_frame} K-line) chart includes automated trendlines: the **blue line** is support, and the **red line** is resistance, both derived from recent closing prices.\n\n"
                         "Analyze how price interacts with these lines — are candles bouncing off, breaking through, or compressing between them?\n\n"
                         "Based on trendline slope, spacing, and recent K-line behavior, predict the likely short-term trend: **upward**, **downward**, or **sideways**. "
-                        "Support your prediction with respect to prediction, reasoning, signals."
+                        "Support your prediction with respect to prediction, reasoning, signals.\n\n"
+                        "⚠️ IMPORTANT: Write your entire analysis report in CHINESE (中文). "
+                        "Use Chinese for all headings, descriptions, and recommendations."
                     ),
                 },
                 {

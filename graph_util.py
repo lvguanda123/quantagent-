@@ -1,5 +1,7 @@
 import base64
 import io
+import os
+from pathlib import Path
 from typing import Annotated
 
 import matplotlib
@@ -13,6 +15,22 @@ from langchain_core.tools import tool
 import color_style as color
 
 matplotlib.use("Agg")
+
+# 保存 record.csv 和 K 线图的基目录
+_RECORD_BASE_DIR = Path("backtest_data")
+_RECORD_BASE_DIR.mkdir(exist_ok=True)
+
+
+def _make_record_dir(symbol: str, run_ts: str = None) -> Path:
+    """为指定股票创建按日期分组的记录目录."""
+    from datetime import datetime
+    if run_ts is None:
+        run_ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    sym_dir = _RECORD_BASE_DIR / symbol
+    sym_dir.mkdir(exist_ok=True)
+    run_dir = sym_dir / run_ts
+    run_dir.mkdir(exist_ok=True)
+    return run_dir
 
 
 # helper function for trending graph
@@ -261,13 +279,17 @@ class TechnicalTools:
             dict,
             "Dictionary containing OHLCV data with keys 'Datetime', 'Open', 'High', 'Low', 'Close'.",
         ],
+        stock_name: Annotated[
+            str,
+            "Stock symbol for organizing output directory (optional, default: 'default')",
+        ] = "default",
     ) -> dict:
         """
         Generate a candlestick (K-line) chart from OHLCV data, save it locally, and return a base64-encoded image.
 
         Args:
             kline_data (dict): Dictionary with keys including 'Datetime', 'Open', 'High', 'Low', 'Close'.
-            filename (str): Name of the file to save the image locally (default: 'kline_chart.png').
+            stock_name (str): Stock symbol for organizing output directory.
 
         Returns:
             dict: Dictionary containing base64-encoded image string and local file path.
@@ -277,15 +299,23 @@ class TechnicalTools:
         # take recent 40
         df = df.tail(40)
 
-        df.to_csv("record.csv", index=False, date_format="%Y-%m-%d %H:%M:%S")
         try:
-            # df.index = pd.to_datetime(df["Datetime"])
-            df.index = pd.to_datetime(df["Datetime"], format="%Y-%m-%d %H:%M:%S")
+            df.index = pd.to_datetime(df["Datetime"])
+        except (ValueError, KeyError):
+            try:
+                df.index = pd.to_datetime(df["Datetime"], format="%Y-%m-%d %H:%M:%S")
+            except (ValueError, KeyError):
+                print("ValueError: could not parse Datetime column in graph_util.py\n")
+                return {"pattern_image": "", "pattern_image_description": "Failed to parse datetime"}
 
-        except ValueError:
-            print("ValueError at graph_util.py\n")
+        # 创建按股票+时间分组的目录
+        record_dir = _make_record_dir(stock_name)
+
+        # 保存原始数据
+        df.to_csv(record_dir / "record.csv", index=False)
 
         # Save image locally
+        kline_path = record_dir / "kline_chart.png"
         fig, axlist = mpf.plot(
             df[["Open", "High", "Low", "Close"]],
             type="candle",
@@ -298,7 +328,7 @@ class TechnicalTools:
         axlist[0].set_xlabel("Datetime", fontweight="normal")
 
         fig.savefig(
-            fname="kline_chart.png",
+            fname=str(kline_path),
             dpi=600,
             bbox_inches="tight",
             pad_inches=0.1,
@@ -315,6 +345,8 @@ class TechnicalTools:
         return {
             "pattern_image": img_b64,
             "pattern_image_description": "Candlestick chart saved locally and returned as base64 string.",
+            "record_dir": str(record_dir),
+            "kline_path": str(kline_path),
         }
 
     @staticmethod

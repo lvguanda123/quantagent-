@@ -1,12 +1,13 @@
 DEFAULT_CONFIG = {
-    "agent_llm_model": "gpt-4o-mini",
-    "graph_llm_model": "gpt-4o",
-    "agent_llm_provider": "openai",  # "openai", "anthropic", "qwen", or "minimax"
-    "graph_llm_provider": "openai",  # "openai", "anthropic", "qwen", or "minimax"
+    "agent_llm_model": "qwen3.6-plus",
+    "graph_llm_model": "qwen3.6-plus",
+    "agent_llm_provider": "anthropic",
+    "graph_llm_provider": "anthropic",
     "agent_llm_temperature": 0.1,
     "graph_llm_temperature": 0.1,
-    "api_key": "sk-",  # OpenAI API key
-    "anthropic_api_key": "sk-",  # Anthropic API key (optional, can also use ANTHROPIC_API_KEY env var)
-    "qwen_api_key": "sk-",  # Qwen API key (optional, can also use DASHSCOPE_API_KEY env var)
-    "minimax_api_key": "",  # MiniMax API key (optional, can also use MINIMAX_API_KEY env var)
+    "base_url": "https://new.samerwang.dpdns.org",
+    "api_key": "",
+    "anthropic_api_key": "sk-he9z9G1gu5374yAc6K6ua5sCVXSqc3U3qhnltO0Ls8GKf0aQ",
+    "qwen_api_key": "",
+    "minimax_api_key": "",
 }

@@ -7,6 +7,17 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from openai import RateLimitError
 
 
+def _ensure_dict_args(args):
+    """Ensure tool call args is a dict, parsing from JSON string if needed."""
+    import json
+    if isinstance(args, str):
+        try:
+            return json.loads(args)
+        except (json.JSONDecodeError, TypeError):
+            return {}
+    return args
+
+
 def invoke_tool_with_retry(tool_fn, tool_args, retries=3, wait_sec=4):
     """
     Invoke a tool function with retries if the result is missing an image.
@@ -34,24 +45,24 @@ def create_pattern_agent(tool_llm, graph_llm, toolkit):
         tools = [toolkit.generate_kline_image]
         time_frame = state["time_frame"]
         pattern_text = """
-        Please refer to the following classic candlestick patterns:
+        请参考以下经典K线形态（Candlestick Patterns）：
 
-        1. Inverse Head and Shoulders: Three lows with the middle one being the lowest, symmetrical structure, typically indicates an upcoming upward trend.
-        2. Double Bottom: Two similar low points with a rebound in between, forming a 'W' shape.
-        3. Rounded Bottom: Gradual price decline followed by a gradual rise, forming a 'U' shape.
-        4. Hidden Base: Horizontal consolidation followed by a sudden upward breakout.
-        5. Falling Wedge: Price narrows downward, usually breaks out upward.
-        6. Rising Wedge: Price rises slowly but converges, often breaks down.
-        7. Ascending Triangle: Rising support line with a flat resistance on top, breakout often occurs upward.
-        8. Descending Triangle: Falling resistance line with flat support at the bottom, typically breaks down.
-        9. Bullish Flag: After a sharp rise, price consolidates downward briefly before continuing upward.
-        10. Bearish Flag: After a sharp drop, price consolidates upward briefly before continuing downward.
-        11. Rectangle: Price fluctuates between horizontal support and resistance.
-        12. Island Reversal: Two price gaps in opposite directions forming an isolated price island.
-        13. V-shaped Reversal: Sharp decline followed by sharp recovery, or vice versa.
-        14. Rounded Top / Rounded Bottom: Gradual peaking or bottoming, forming an arc-shaped pattern.
-        15. Expanding Triangle: Highs and lows increasingly wider, indicating volatile swings.
-        16. Symmetrical Triangle: Highs and lows converge toward the apex, usually followed by a breakout.
+        1. 头肩底（Inverse Head and Shoulders）：三个低点，中间最低，对称结构，通常预示上涨趋势。
+        2. 双底（Double Bottom）：两个相似低点，中间反弹，呈"W"形。
+        3. 圆弧底（Rounded Bottom）：价格逐渐下跌后逐渐回升，呈"U"形。
+        4. 潜伏底（Hidden Base）：水平横盘整理后突然向上突破。
+        5. 下降楔形（Falling Wedge）：价格向下收敛，通常向上突破。
+        6. 上升楔形（Rising Wedge）：价格上升但逐渐收敛，通常向下突破。
+        7. 上升三角形（Ascending Triangle）：支撑线上升，阻力线水平，通常向上突破。
+        8. 下降三角形（Descending Triangle）：阻力线下降，支撑线水平，通常向下突破。
+        9. 看涨旗形（Bullish Flag）：急涨后短暂向下整理，然后继续上涨。
+        10. 看跌旗形（Bearish Flag）：急跌后短暂向上整理，然后继续下跌。
+        11. 矩形整理（Rectangle）：价格在水平支撑和阻力之间波动。
+        12. 岛形反转（Island Reversal）：两个反向跳空缺口形成孤立价格孤岛。
+        13. V形反转（V-shaped Reversal）：急跌后急涨，或反之。
+        14. 圆弧顶/圆弧底（Rounded Top/Bottom）：逐渐见顶或见底，呈弧形。
+        15. 扩散三角形（Expanding Triangle）：高低点逐渐扩大，波动加剧。
+        16. 对称三角形（Symmetrical Triangle）：高低点向顶点收敛，通常随后出现突破。
         """
 
         # --- Check for precomputed image in state ---
@@ -106,7 +117,7 @@ def create_pattern_agent(tool_llm, graph_llm, toolkit):
             if hasattr(ai_response, "tool_calls"):
                 for call in ai_response.tool_calls:
                     tool_name = call["name"]
-                    tool_args = call["args"]
+                    tool_args = _ensure_dict_args(call.get("args", {}))
                     # Always provide kline_data
                     tool_args["kline_data"] = copy.deepcopy(state["kline_data"])
                     tool_fn = next(t for t in tools if t.name == tool_name)
@@ -129,7 +140,9 @@ def create_pattern_agent(tool_llm, graph_llm, toolkit):
                         f"This is a {time_frame} candlestick chart generated from recent OHLC market data.\n\n"
                         f"{pattern_text}\n\n"
                         "Determine whether the chart matches any of the patterns listed. "
-                        "Clearly name the matched pattern(s), and explain your reasoning based on structure, trend, and symmetry."
+                        "Clearly name the matched pattern(s), and explain your reasoning based on structure, trend, and symmetry.\n\n"
+                        "⚠️ IMPORTANT: Write your entire analysis report in CHINESE (中文). "
+                        "Use Chinese for all headings, descriptions, and recommendations."
                     ),
                 },
                 {
