@@ -1,0 +1,42 @@
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Generated files
+kline_chart.png
+trend_graph.png
+record.csv
+
+# IDE
+.vscode/settings.json
+
+# PDFs and temp files
+ICLR2026_QuantAgent (18).pdf
+pdf_content.txt
+read.html
+read_files/
+app/
+
+# Virtual environments
+venv/
+envs/
+python311.exe
+
+# Data and backtest artifacts
+data/
+backtesting/
+.backtest_cache/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment secrets
+.env
+.env.local
+
+# Test files
+test_*.py
