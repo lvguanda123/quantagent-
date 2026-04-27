@@ -1,3 +1,4 @@
+# Python cache
 __pycache__/
 *.pyc
 *.pyo
@@ -5,7 +6,7 @@ __pycache__/
 dist/
 build/
 
-# Generated files
+# Generated images & files
 kline_chart.png
 trend_graph.png
 record.csv
@@ -13,7 +14,7 @@ record.csv
 # IDE
 .vscode/settings.json
 
-# PDFs and temp files
+# PDFs & temp files
 ICLR2026_QuantAgent (18).pdf
 pdf_content.txt
 read.html
@@ -25,9 +26,13 @@ venv/
 envs/
 python311.exe
 
-# Data and backtest artifacts
-data/
+# Local directories
+miniconda/
+benchmark/
+backtest_data/
+backtest_results/
 backtesting/
+data/
 .backtest_cache/
 
 # OS files
@@ -37,6 +42,3 @@ Thumbs.db
 # Environment secrets
 .env
 .env.local
-
-# Test files
-test_*.py
