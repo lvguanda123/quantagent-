@@ -15,8 +15,15 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["app"],
-    "icon": ["icons/icon.png"],
-    "resources": ["../bundled-backend"]
+    "targets": [
+      "nsis",
+      "msi"
+    ],
+    "icon": [
+      "icons/icon.png"
+    ],
+    "resources": [
+      "../bundled-backend"
+    ]
   }
 }
