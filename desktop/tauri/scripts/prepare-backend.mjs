@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdirSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -66,17 +66,22 @@ function copyRequired(source, target) {
 }
 
 function findSitePackages() {
-  const candidates = [
-    join(projectRoot, ".venv/lib/python3.13/site-packages"),
-    join(projectRoot, ".venv/lib/python3.12/site-packages"),
-    join(projectRoot, ".venv/lib/python3.11/site-packages"),
-    join(projectRoot, ".venv/lib/python3.10/site-packages"),
-    join(projectRoot, ".venv/lib/python3.9/site-packages"),
-  ];
+  const candidates = [join(projectRoot, ".venv/Lib/site-packages")];
+  const unixVenvLib = join(projectRoot, ".venv/lib");
+
+  if (existsSync(unixVenvLib)) {
+    for (const entry of readdirSync(unixVenvLib, { withFileTypes: true })) {
+      if (entry.isDirectory() && entry.name.startsWith("python")) {
+        candidates.push(join(unixVenvLib, entry.name, "site-packages"));
+      }
+    }
+  }
 
   const found = candidates.find((candidate) => existsSync(candidate));
   if (!found) {
-    throw new Error(`Could not find .venv site-packages under ${projectRoot}`);
+    throw new Error(
+      `Could not find .venv site-packages under ${projectRoot}. Checked:\n${candidates.join("\n")}`
+    );
   }
 
   return found;
