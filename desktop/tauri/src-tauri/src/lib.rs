@@ -2,7 +2,7 @@ use std::{
     fs::{self, File},
     io::{Read, Write},
     net::{TcpStream, ToSocketAddrs},
-    path::{Path, PathBuf},
+    path::PathBuf,
     process::{Child, Command, Stdio},
     sync::{Mutex, OnceLock},
     thread,
@@ -17,6 +17,7 @@ const STARTUP_TIMEOUT: Duration = Duration::from_secs(90);
 
 static FLASK_PROCESS: OnceLock<Mutex<Option<Child>>> = OnceLock::new();
 static STARTUP_LOGS: OnceLock<StartupLogs> = OnceLock::new();
+static BACKEND_ROOT: OnceLock<PathBuf> = OnceLock::new();
 
 #[derive(Clone)]
 struct StartupLogs {
@@ -28,7 +29,7 @@ struct StartupLogs {
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
-            match ensure_flask_ready() {
+            match ensure_flask_ready(app) {
                 Ok(()) => create_main_window(app)?,
                 Err(error) => create_error_window(app, &error.to_string())?,
             }
@@ -46,34 +47,47 @@ pub fn run() {
         .expect("error while running QuantAgent desktop app");
 }
 
-fn ensure_flask_ready() -> Result<(), Box<dyn std::error::Error>> {
+fn ensure_flask_ready(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     if is_flask_ready() {
         return Ok(());
     }
 
-    start_flask()?;
+    start_flask(app)?;
     wait_for_flask()
 }
 
-fn start_flask() -> Result<(), Box<dyn std::error::Error>> {
-    let project_root = project_root();
-    let python = python_path(&project_root);
-    let script = project_root.join("web_interface.py");
+fn start_flask(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+    let resource_dir = app.path().resource_dir()?;
+    let bundled_backend = bundled_backend_root(&resource_dir)?;
+    let backend_root = bundled_backend.join("backend");
+    let site_packages = bundled_backend.join("python/site-packages");
+    let python = python_path();
+    let script = backend_root.join("web_interface.py");
 
-    if !python.exists() {
-        return Err(format!("Python not found: {}", python.display()).into());
+    if !backend_root.exists() {
+        return Err(format!("Bundled backend not found: {}", backend_root.display()).into());
     }
 
     if !script.exists() {
         return Err(format!("Flask entry file not found: {}", script.display()).into());
     }
 
+    if !site_packages.exists() {
+        return Err(format!("Bundled Python dependencies not found: {}", site_packages.display()).into());
+    }
+
+    let _ = BACKEND_ROOT.set(backend_root.clone());
     let logs = startup_logs()?;
     let stdout = File::create(&logs.stdout)?;
     let stderr = File::create(&logs.stderr)?;
     let child = Command::new(&python)
         .arg(&script)
-        .current_dir(&project_root)
+        .current_dir(&backend_root)
+        .env(
+            "PYTHONPATH",
+            format!("{}:{}", site_packages.display(), backend_root.display()),
+        )
+        .env("MPLCONFIGDIR", log_dir()?.join("matplotlib"))
         .env("PYTHONUNBUFFERED", "1")
         .stdin(Stdio::null())
         .stdout(Stdio::from(stdout))
@@ -82,7 +96,7 @@ fn start_flask() -> Result<(), Box<dyn std::error::Error>> {
         .map_err(|error| {
             format!(
                 "Failed to start Flask with {} {}: {error}",
-                python.display(),
+                python,
                 script.display()
             )
         })?;
@@ -221,7 +235,7 @@ fn write_error_page(message: &str) -> std::io::Result<PathBuf> {
 </html>"#,
         url = FLASK_URL,
         message = escape_html(message),
-        project_root = escape_html(&project_root().display().to_string()),
+        project_root = escape_html(&backend_root_display()),
         stdout = escape_html(&stdout),
         stderr = escape_html(&stderr),
     );
@@ -231,8 +245,7 @@ fn write_error_page(message: &str) -> std::io::Result<PathBuf> {
 }
 
 fn startup_logs() -> std::io::Result<StartupLogs> {
-    let dir = project_root().join("desktop/tauri/logs");
-    fs::create_dir_all(&dir)?;
+    let dir = log_dir()?;
     let stamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
@@ -242,6 +255,12 @@ fn startup_logs() -> std::io::Result<StartupLogs> {
         stdout: dir.join(format!("flask-{stamp}.stdout.log")),
         stderr: dir.join(format!("flask-{stamp}.stderr.log")),
     })
+}
+
+fn log_dir() -> std::io::Result<PathBuf> {
+    let dir = std::env::temp_dir().join("quantagent-tauri-logs");
+    fs::create_dir_all(&dir)?;
+    Ok(dir)
 }
 
 fn log_summary() -> String {
@@ -257,12 +276,33 @@ fn log_summary() -> String {
         .unwrap_or_else(|| "No Flask logs were created.".to_string())
 }
 
-fn project_root() -> PathBuf {
-    PathBuf::from(env!("QUANTAGENT_PROJECT_ROOT"))
+fn backend_root_display() -> String {
+    BACKEND_ROOT
+        .get()
+        .map(|path| path.display().to_string())
+        .unwrap_or_else(|| "Bundled backend was not resolved.".to_string())
 }
 
-fn python_path(project_root: &Path) -> PathBuf {
-    project_root.join(".venv/bin/python")
+fn python_path() -> String {
+    "python3".to_string()
+}
+
+fn bundled_backend_root(resource_dir: &PathBuf) -> Result<PathBuf, Box<dyn std::error::Error>> {
+    let candidates = [
+        resource_dir.join("bundled-backend"),
+        resource_dir.join("_up_/bundled-backend"),
+    ];
+
+    candidates
+        .into_iter()
+        .find(|candidate| candidate.join("backend/web_interface.py").exists())
+        .ok_or_else(|| {
+            format!(
+                "Bundled backend not found under resources directory: {}",
+                resource_dir.display()
+            )
+            .into()
+        })
 }
 
 fn stop_managed_flask() {

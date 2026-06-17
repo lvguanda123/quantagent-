@@ -38,8 +38,24 @@ jobs:
         working-directory: desktop/tauri
         run: npm install
 
+      - name: Reset Cargo registry config
+        shell: bash
+        run: |
+          rm -f ~/.cargo/config
+          rm -f ~/.cargo/config.toml
+          rm -f .cargo/config
+          rm -f .cargo/config.toml
+          rm -f desktop/tauri/.cargo/config
+          rm -f desktop/tauri/.cargo/config.toml
+          rm -f desktop/tauri/src-tauri/.cargo/config
+          rm -f desktop/tauri/src-tauri/.cargo/config.toml
+          rm -rf ~/.cargo/registry/index/*
+          cargo --version
+
       - name: Build Tauri Windows app
         working-directory: desktop/tauri
+        env:
+          CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
         run: npx tauri build --verbose
 
       - name: Upload Windows build

@@ -2,6 +2,7 @@ node_modules/
 .npm-cache/
 .cargo-home/
 logs/
+bundled-backend/
 src-tauri/target/
 src-tauri/gen/
 *.log

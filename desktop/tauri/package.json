@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "prepare-backend": "node scripts/prepare-backend.mjs",
     "dev": "node scripts/tauri.mjs dev",
     "build": "node scripts/tauri.mjs build",
     "tauri": "node scripts/tauri.mjs"

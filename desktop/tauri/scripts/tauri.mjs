@@ -8,6 +8,10 @@ const env = {
   CARGO_HOME: resolve(".cargo-home"),
 };
 
+if (args[0] === "build") {
+  run("node", ["scripts/prepare-backend.mjs"]);
+}
+
 const tauri = spawnSync("tauri", args, {
   env,
   stdio: "inherit",
