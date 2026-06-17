@@ -57,7 +57,9 @@ jobs:
         shell: bash
         run: |
           node scripts/prepare-backend.mjs
-          ls -la src-tauri
+          rm -rf src-tauri/bundled-backend
+          cp -R bundled-backend src-tauri/bundled-backend
+          ls -la bundled-backend
           ls -la src-tauri/bundled-backend
 
       - name: Build Tauri Windows app
