@@ -5,6 +5,8 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+!desktop/tauri/dist/
+!desktop/tauri/dist/index.html
 
 # Generated images & files
 kline_chart.png
