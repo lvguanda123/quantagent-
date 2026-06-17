@@ -68,9 +68,19 @@ jobs:
           CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
         run: npx tauri build --verbose
 
+      - name: Show build outputs
+        shell: bash
+        run: |
+          echo "Listing likely Windows outputs:"
+          find desktop/tauri/src-tauri/target -type f \( -name "*.exe" -o -name "*.msi" -o -name "*.zip" \) | sort
+
       - name: Upload Windows build
         uses: actions/upload-artifact@v4
         with:
           name: quantagent-windows
+          if-no-files-found: error
           path: |
+            desktop/tauri/src-tauri/target/release/*.exe
             desktop/tauri/src-tauri/target/release/bundle/**/*
+            desktop/tauri/src-tauri/target/x86_64-pc-windows-msvc/release/*.exe
+            desktop/tauri/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/**/*
