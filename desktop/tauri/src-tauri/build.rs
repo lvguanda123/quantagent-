@@ -8,11 +8,19 @@ fn main() {
         .canonicalize()
         .expect("failed to resolve QuantAgent project root");
 
+    let python_path = if cfg!(windows) {
+        project_root.join(".venv").join("Scripts").join("python.exe")
+    } else {
+        project_root.join(".venv").join("bin").join("python")
+    };
+
     assert!(
-        project_root.join(".venv/bin/python").exists(),
-        "failed to find .venv/bin/python under {}",
+        python_path.exists(),
+        "failed to find Python at {} under {}",
+        python_path.display(),
         project_root.display()
     );
+
     assert!(
         project_root.join("web_interface.py").exists(),
         "failed to find web_interface.py under {}",
@@ -23,5 +31,6 @@ fn main() {
         "cargo:rustc-env=QUANTAGENT_PROJECT_ROOT={}",
         project_root.display()
     );
+
     tauri_build::build()
 }
