@@ -52,6 +52,14 @@ jobs:
           rm -rf ~/.cargo/registry/index/*
           cargo --version
 
+      - name: Prepare bundled backend
+        working-directory: desktop/tauri
+        shell: bash
+        run: |
+          node scripts/prepare-backend.mjs
+          ls -la src-tauri
+          ls -la src-tauri/bundled-backend
+
       - name: Build Tauri Windows app
         working-directory: desktop/tauri
         env:
