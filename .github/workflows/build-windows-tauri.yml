@@ -28,12 +28,11 @@ jobs:
 
       - name: Build Tauri Windows app
         working-directory: desktop/tauri
-        run: npm run tauri build
+        run: npx tauri build --verbose
 
       - name: Upload Windows build
         uses: actions/upload-artifact@v4
         with:
           name: quantagent-windows
           path: |
-            desktop/tauri/src-tauri/target/release/bundle/nsis/*
-            desktop/tauri/src-tauri/target/release/bundle/msi/*
+            desktop/tauri/src-tauri/target/release/bundle/**/*
