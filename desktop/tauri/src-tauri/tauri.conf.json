@@ -20,7 +20,7 @@
       "msi"
     ],
     "icon": [
-      "icons/icon.png"
+      "icons/icon.ico"
     ],
     "resources": [
       "../bundled-backend"
