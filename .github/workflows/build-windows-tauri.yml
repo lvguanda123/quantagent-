@@ -1,0 +1,39 @@
+name: Build Windows Tauri
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - neoding-demo
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install frontend dependencies
+        working-directory: desktop/tauri
+        run: npm install
+
+      - name: Build Tauri Windows app
+        working-directory: desktop/tauri
+        run: npm run tauri build
+
+      - name: Upload Windows build
+        uses: actions/upload-artifact@v4
+        with:
+          name: quantagent-windows
+          path: |
+            desktop/tauri/src-tauri/target/release/bundle/nsis/*
+            desktop/tauri/src-tauri/target/release/bundle/msi/*
