@@ -3,10 +3,13 @@ TradingGraph: Orchestrates the multi-agent trading system using LangChain and La
 Initializes LLMs, toolkits, and agent nodes for indicator, pattern, and trend analysis.
 """
 
+import json
 import os
 from typing import Dict
 
+import requests
 from langchain_anthropic import ChatAnthropic
+from langchain_core.messages import AIMessage
 from langchain_core.language_models import BaseChatModel
 from langchain_openai import ChatOpenAI
 from langchain_qwq import ChatQwen
@@ -15,6 +18,82 @@ from langgraph.prebuilt import ToolNode
 from default_config import DEFAULT_CONFIG
 from graph_setup import SetGraph
 from graph_util import TechnicalTools
+
+
+class SohuChatModel:
+    """Minimal OpenAI-compatible client that preserves Sohu reasoning_content."""
+
+    metadata = {"quantagent_provider": "sohu"}
+
+    def __init__(self, model: str, api_key: str, temperature: float):
+        self.model_name = model
+        self.api_key = api_key
+        self.temperature = temperature
+
+    def invoke(self, messages):
+        if isinstance(messages, str):
+            messages = [{"role": "user", "content": messages}]
+        else:
+            converted = []
+            for message in messages:
+                role = {
+                    "system": "system",
+                    "human": "user",
+                    "ai": "assistant",
+                }.get(getattr(message, "type", "human"), "user")
+                converted.append({"role": role, "content": message.content})
+            messages = converted
+
+        try:
+            response = requests.post(
+                "https://llm-api-test.tv.sohuno.com/v1/chat/completions",
+                headers={"Authorization": f"Bearer {self.api_key}"},
+                json={
+                    "model": self.model_name,
+                    "messages": messages,
+                    "temperature": self.temperature,
+                    "max_tokens": 512,
+                    "enable_thinking": False,
+                    "stream": True,
+                },
+                stream=True,
+                timeout=(10, 180),
+            )
+        except requests.exceptions.Timeout as exc:
+            raise RuntimeError("搜狐模型响应超时，请稍后重试") from exc
+        except requests.exceptions.RequestException as exc:
+            raise RuntimeError(f"搜狐模型连接失败：{exc}") from exc
+
+        if not response.ok:
+            raise ValueError(f"搜狐模型请求失败（HTTP {response.status_code}）：{response.text}")
+
+        content_parts = []
+        reasoning_parts = []
+        for raw_line in response.iter_lines(decode_unicode=True):
+            if not raw_line or not raw_line.startswith("data:"):
+                continue
+            data = raw_line[5:].strip()
+            if data == "[DONE]":
+                break
+            try:
+                chunk = json.loads(data)
+            except json.JSONDecodeError:
+                continue
+            delta = ((chunk.get("choices") or [{}])[0].get("delta") or {})
+            if delta.get("content"):
+                content_parts.append(delta["content"])
+            if delta.get("reasoning_content"):
+                reasoning_parts.append(delta["reasoning_content"])
+
+        content = "".join(content_parts) or "".join(reasoning_parts)
+        if not content:
+            # Keep compatibility with non-streaming responses and test doubles.
+            payload = response.json()
+            message = (payload.get("choices") or [{}])[0].get("message") or {}
+            content = message.get("content") or message.get("reasoning_content") or ""
+        if not content:
+            raise ValueError("搜狐模型返回成功，但响应中没有 content 或 reasoning_content")
+        return AIMessage(content=content)
 
 
 class TradingGraph:
@@ -61,7 +140,7 @@ class TradingGraph:
         Get API key with proper validation and error handling.
         
         Args:
-            provider: The provider name ("openai", "anthropic", or "qwen")
+            provider: The provider name
         
         Returns:
             str: The API key for the specified provider
@@ -155,8 +234,24 @@ class TradingGraph:
                     "Please provide your actual MiniMax API key. "
                     "You can get one from: https://platform.minimaxi.com/"
                 )
+        elif provider == "sohu":
+            api_key = self.config.get("sohu_api_key")
+
+            if not api_key:
+                api_key = os.environ.get("SOHU_API_KEY")
+
+            if not api_key:
+                raise ValueError(
+                    "Sohu API key not found. Please set it using one of these methods:\n"
+                    "1. Set environment variable: export SOHU_API_KEY='your-key-here'\n"
+                    "2. Update the config with: config['sohu_api_key'] = 'your-key-here'\n"
+                    "3. Use the web interface to update the API key"
+                )
         else:
-            raise ValueError(f"Unsupported provider: {provider}. Must be 'openai', 'anthropic', 'qwen', or 'minimax'")
+            raise ValueError(
+                f"Unsupported provider: {provider}. Must be 'openai', 'anthropic', "
+                "'qwen', 'minimax', or 'sohu'"
+            )
         
         return api_key
 
@@ -167,7 +262,7 @@ class TradingGraph:
         Create an LLM instance based on the provider.
 
         Args:
-            provider: The provider name ("openai", "anthropic", "qwen", or "minimax")
+            provider: The provider name
             model: The model name (e.g., "gpt-4o", "claude-3-5-sonnet-20241022", "qwen-vl-max-latest", "MiniMax-M2.7")
             temperature: The temperature setting for the model
 
@@ -209,8 +304,17 @@ class TradingGraph:
                 api_key=api_key,
                 openai_api_base="https://api.minimax.io/v1",
             )
+        elif provider == "sohu":
+            return SohuChatModel(
+                model=model,
+                temperature=temperature,
+                api_key=api_key,
+            )
         else:
-            raise ValueError(f"Unsupported provider: {provider}. Must be 'openai', 'anthropic', 'qwen', or 'minimax'")
+            raise ValueError(
+                f"Unsupported provider: {provider}. Must be 'openai', 'anthropic', "
+                "'qwen', 'minimax', or 'sohu'"
+            )
 
     # def _set_tool_nodes(self) -> Dict[str, ToolNode]:
     #     """
@@ -297,8 +401,14 @@ class TradingGraph:
 
             # Also update the environment variable for consistency
             os.environ["MINIMAX_API_KEY"] = api_key
+        elif provider == "sohu":
+            self.config["sohu_api_key"] = api_key
+            os.environ["SOHU_API_KEY"] = api_key
         else:
-            raise ValueError(f"Unsupported provider: {provider}. Must be 'openai', 'anthropic', 'qwen', or 'minimax'")
+            raise ValueError(
+                f"Unsupported provider: {provider}. Must be 'openai', 'anthropic', "
+                "'qwen', 'minimax', or 'sohu'"
+            )
         
         # Refresh the LLMs with the new API key
         self.refresh_llms()

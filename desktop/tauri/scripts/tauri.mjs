@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { cpSync, existsSync, rmSync } from "node:fs";
+import { join, resolve } from "node:path";
 
 const args = process.argv.slice(2);
 const env = {
@@ -8,7 +8,7 @@ const env = {
   CARGO_HOME: resolve(".cargo-home"),
 };
 
-if (args[0] === "build") {
+if (args[0] === "dev" || args[0] === "build") {
   run("node", ["scripts/prepare-backend.mjs"]);
 }
 
@@ -32,9 +32,21 @@ function fixMacAppBundle() {
     return;
   }
 
+  syncMacBundledBackend(appPath);
   run("xattr", ["-cr", appPath]);
   run("codesign", ["--force", "--deep", "--sign", "-", appPath]);
   run("codesign", ["--verify", "--deep", "--strict", "--verbose=2", appPath]);
+}
+
+function syncMacBundledBackend(appPath) {
+  const source = resolve("bundled-backend");
+  const target = join(appPath, "Contents/Resources/_up_/bundled-backend");
+  if (!existsSync(source)) {
+    return;
+  }
+
+  rmSync(target, { recursive: true, force: true });
+  cpSync(source, target, { recursive: true });
 }
 
 function run(command, commandArgs) {

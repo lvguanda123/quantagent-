@@ -10,4 +10,5 @@ DEFAULT_CONFIG = {
     "anthropic_api_key": "sk-he9z9G1gu5374yAc6K6ua5sCVXSqc3U3qhnltO0Ls8GKf0aQ",
     "qwen_api_key": "",
     "minimax_api_key": "",
+    "sohu_api_key": "",
 }

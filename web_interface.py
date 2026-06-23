@@ -7,7 +7,9 @@ import json
 import os
 import re
 import requests
+import threading
 import urllib.parse
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict
@@ -22,9 +24,9 @@ from trading_graph import TradingGraph
 try:
     import akshare as ak
     AKSHARE_AVAILABLE = True
-except ImportError:
+except ImportError as error:
     AKSHARE_AVAILABLE = False
-    print("Warning: AKShare not available")
+    print(f"Warning: AKShare not available: {error}")
 
 app = Flask(__name__, static_folder="static", static_url_path="/static")
 
@@ -34,6 +36,32 @@ class WebTradingAnalyzer:
         from default_config import DEFAULT_CONFIG
         self.config = DEFAULT_CONFIG.copy()
         self.trading_graph = TradingGraph(config=self.config)
+
+    def update_api_key(self, api_key: str, provider: str = "openai"):
+        """Update a provider key using the trading graph's existing storage flow."""
+        self.trading_graph.update_api_key(api_key, provider)
+
+    def validate_sohu_api_key(self, api_key: str):
+        """Validate Sohu with a minimal text-only Chat Completions request."""
+        response = requests.post(
+            "https://llm-api-test.tv.sohuno.com/v1/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}"},
+            json={
+                "model": self.config.get("agent_llm_model", "qwen3.6-plus"),
+                "messages": [{"role": "user", "content": "Reply with OK."}],
+                "max_tokens": 8,
+            },
+            timeout=20,
+        )
+        if response.ok:
+            return
+
+        try:
+            error_data = response.json()
+            message = error_data.get("message") or error_data.get("error")
+        except ValueError:
+            message = response.text
+        raise ValueError(f"搜狐接口验证失败（HTTP {response.status_code}）：{message or '未知错误'}")
 
     def fetch_akshare_stock_data(
         self, symbol: str, start_date: str, end_date: str
@@ -468,6 +496,88 @@ class WebTradingAnalyzer:
 
 
 analyzer = WebTradingAnalyzer()
+analysis_jobs = {}
+analysis_jobs_lock = threading.Lock()
+
+
+def _has_report_text(value: Any) -> bool:
+    if not isinstance(value, str):
+        return False
+    text = value.strip()
+    if not text:
+        return False
+    placeholders = {
+        "indicator analysis completed.",
+        "trend analysis completed.",
+        "waiting for analysis",
+    }
+    return text.lower() not in placeholders
+
+
+def _latest_number(values: Any):
+    if isinstance(values, list) and values:
+        try:
+            return float(values[-1])
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
+def build_indicator_fallback_report(final_state: Dict[str, Any]) -> str:
+    rsi = _latest_number(final_state.get("rsi"))
+    macd = _latest_number(final_state.get("macd"))
+    macd_signal = _latest_number(final_state.get("macd_signal"))
+    stoch_k = _latest_number(final_state.get("stoch_k"))
+    willr = _latest_number(final_state.get("willr"))
+
+    lines = ["### 技术指标分析", ""]
+    if rsi is not None:
+        if rsi >= 70:
+            lines.append(f"- RSI 当前约为 {rsi:.2f}，处于偏热区域，短线需留意回落风险。")
+        elif rsi <= 30:
+            lines.append(f"- RSI 当前约为 {rsi:.2f}，处于偏冷区域，可能存在技术修复需求。")
+        else:
+            lines.append(f"- RSI 当前约为 {rsi:.2f}，整体处于中性区间。")
+    if macd is not None and macd_signal is not None:
+        relation = "强于" if macd >= macd_signal else "弱于"
+        lines.append(f"- MACD 当前为 {macd:.4f}，{relation}信号线 {macd_signal:.4f}。")
+    if stoch_k is not None:
+        lines.append(f"- 随机指标 %K 当前约为 {stoch_k:.2f}，可结合价格位置观察短线动能。")
+    if willr is not None:
+        lines.append(f"- 威廉指标 %R 当前约为 {willr:.2f}，用于辅助判断超买超卖状态。")
+    if len(lines) == 2:
+        lines.append("- 本次分析未获得完整技术指标文字报告，请参考下方指标数值表。")
+    lines.extend(["", "以上为本地兜底生成的技术指标摘要。"])
+    return "\n".join(lines)
+
+
+def build_trend_fallback_report(final_state: Dict[str, Any]) -> str:
+    kline_data = final_state.get("kline_data", {}) or {}
+    close_values = kline_data.get("Close") or kline_data.get("close") or []
+    trend = "震荡"
+    change_text = ""
+    try:
+        closes = [float(v) for v in close_values if v is not None]
+        if len(closes) >= 2:
+            change = (closes[-1] - closes[0]) / closes[0] * 100 if closes[0] else 0
+            if change > 1:
+                trend = "偏强上行"
+            elif change < -1:
+                trend = "偏弱下行"
+            change_text = f"，区间涨跌幅约 {change:.2f}%"
+    except (TypeError, ValueError):
+        closes = []
+
+    lines = [
+        "### 趋势分析",
+        "",
+        f"- 根据当前 K 线序列，价格整体表现为{trend}{change_text}。",
+        "- 趋势图中的支撑/阻力线可作为观察价格突破或回踩的参考。",
+        "- 若价格持续站上阻力区域，短线动能可能增强；若跌破支撑区域，需要留意回撤风险。",
+        "",
+        "以上为本地兜底生成的趋势摘要。",
+    ]
+    return "\n".join(lines)
 
 
 @app.route("/")
@@ -537,14 +647,21 @@ def analyze():
             stop_loss = parsed.get("止损价格", parsed.get("stop_loss"))
             take_profit = parsed.get("止盈价格", parsed.get("take_profit"))
 
+        indicator_report = final_state.get("indicator_report", "")
+        trend_report = final_state.get("trend_report", "")
+        if not _has_report_text(indicator_report):
+            indicator_report = build_indicator_fallback_report(final_state)
+        if not _has_report_text(trend_report):
+            trend_report = build_trend_fallback_report(final_state)
+
         full_response = {
             "success": True,
             "redirect": "/output",
             "asset_name": results["asset_name"],
             "data_length": results["data_length"],
-            "indicator_report": final_state.get("indicator_report", ""),
+            "indicator_report": indicator_report,
             "pattern_report": final_state.get("pattern_report", ""),
-            "trend_report": final_state.get("trend_report", ""),
+            "trend_report": trend_report,
             "final_trade_decision": cleaned_decision,
             "decision_direction": decision_direction,
             "entry_price": entry_price or final_state.get("entry_price"),
@@ -573,6 +690,47 @@ def analyze():
     except Exception as e:
         print(f"Error: {e}")
         return jsonify({"error": str(e)})
+
+
+def run_analysis_job(job_id: str, data: Dict[str, Any]):
+    """Run the existing synchronous analysis in a background thread."""
+    try:
+        with app.test_request_context("/api/analyze", method="POST", json=data):
+            response = analyze()
+            result = response.get_json()
+        with analysis_jobs_lock:
+            analysis_jobs[job_id] = {"status": "completed", "result": result}
+    except Exception as error:
+        with analysis_jobs_lock:
+            analysis_jobs[job_id] = {"status": "failed", "error": str(error)}
+
+
+@app.route("/api/analyze/start", methods=["POST"])
+def start_analysis():
+    """Start a long-running analysis without holding the WebView connection."""
+    data = request.get_json() or {}
+    if not all([data.get("asset"), data.get("start_date"), data.get("end_date")]):
+        return jsonify({"error": "Missing: asset, start_date, end_date"}), 400
+
+    job_id = uuid.uuid4().hex
+    with analysis_jobs_lock:
+        analysis_jobs[job_id] = {"status": "running"}
+
+    threading.Thread(
+        target=run_analysis_job,
+        args=(job_id, data),
+        daemon=True,
+    ).start()
+    return jsonify({"job_id": job_id}), 202
+
+
+@app.route("/api/analyze/status/<job_id>")
+def analysis_status(job_id: str):
+    with analysis_jobs_lock:
+        job = analysis_jobs.get(job_id)
+    if job is None:
+        return jsonify({"error": "Analysis job not found"}), 404
+    return jsonify(job)
 
 
 @app.route("/api/asset-info/<symbol>")
@@ -720,6 +878,8 @@ def update_api_key():
         if not api_key:
             return jsonify({"success": False, "error": "No API key provided"})
 
+        if provider == "sohu":
+            analyzer.validate_sohu_api_key(api_key)
         analyzer.update_api_key(api_key, provider)
         return jsonify({"success": True, "provider": provider})
     except Exception as e:
@@ -736,13 +896,17 @@ def get_api_key_status():
             "anthropic": "anthropic_api_key",
             "qwen": "qwen_api_key",
             "minimax": "minimax_api_key",
+            "sohu": "sohu_api_key",
         }
         key_name = key_map.get(provider, "api_key")
         api_key = analyzer.config.get(key_name, "")
 
         if api_key and api_key not in ("sk-", ""):
             masked = api_key[:4] + "..." + api_key[-4:] if len(api_key) > 8 else "***"
-            return jsonify({"has_key": True, "masked_key": masked})
+            response = {"has_key": True, "masked_key": masked}
+            if request.args.get("reveal") == "1":
+                response["api_key"] = api_key
+            return jsonify(response)
         return jsonify({"has_key": False})
     except Exception as e:
         return jsonify({"error": str(e), "has_key": False})
@@ -751,4 +915,10 @@ def get_api_key_status():
 if __name__ == "__main__":
     Path("templates").mkdir(exist_ok=True)
     Path("static").mkdir(exist_ok=True)
-    app.run(debug=True, host="127.0.0.1", port=5000)
+    desktop_mode = os.environ.get("QUANTAGENT_DESKTOP") == "1"
+    if desktop_mode:
+        from waitress import serve
+
+        serve(app, host="127.0.0.1", port=5000, threads=8)
+    else:
+        app.run(debug=True, use_reloader=True, host="127.0.0.1", port=5000)

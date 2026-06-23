@@ -6,12 +6,29 @@
     <title>QuantAgent - Multi-Agent Trading System</title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        (function () {
+            const savedTheme = localStorage.getItem('quantagent_theme') || 'light';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        })();
+    </script>
     <style>
                  :root {
              --etrade-purple: #241056;
              --etrade-purple-light: #5627D8;
              --etrade-purple-dark: #1A0B3A;
              --etrade-purple-bg: #F8F5FF;
+            --page-bg: #F8F5FF;
+            --surface-bg: #ffffff;
+            --surface-muted: #F9FAFB;
+            --toolbar-bg: rgba(255, 255, 255, 0.9);
+            --toolbar-border: rgba(209, 213, 219, 0.72);
+            --text-primary: #1F2937;
+            --text-secondary: #4B5563;
+            --text-muted: #6B7280;
+            --input-bg: #ffffff;
+            --soft-shadow: 0 25px 50px -12px rgba(36, 16, 86, 0.25);
+            --panel-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
             --white: #ffffff;
             --gray-50: #F9FAFB;
             --gray-100: #F3F4F6;
@@ -25,6 +42,35 @@
             --gray-900: #111827;
         }
 
+        :root[data-theme="dark"] {
+            --etrade-purple: #C9B8FF;
+            --etrade-purple-light: #9B7CFF;
+            --etrade-purple-dark: #080B14;
+            --etrade-purple-bg: #0E1118;
+            --page-bg: #0E1118;
+            --surface-bg: #171C26;
+            --surface-muted: #202838;
+            --toolbar-bg: rgba(15, 19, 28, 0.92);
+            --toolbar-border: rgba(124, 139, 166, 0.22);
+            --text-primary: #EEF2F7;
+            --text-secondary: #C7D0DD;
+            --text-muted: #9AA8BA;
+            --input-bg: #111722;
+            --soft-shadow: 0 24px 52px rgba(0, 0, 0, 0.46);
+            --panel-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
+            --white: #171C26;
+            --gray-50: #202838;
+            --gray-100: #263041;
+            --gray-200: #303A4D;
+            --gray-300: #42506A;
+            --gray-400: #7C8BA6;
+            --gray-500: #9AA8BA;
+            --gray-600: #C7D0DD;
+            --gray-700: #DDE5EE;
+            --gray-800: #EEF2F7;
+            --gray-900: #F8FAFC;
+        }
+
         * {
             box-sizing: border-box;
             border-width: 0;
@@ -34,11 +80,12 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: var(--etrade-purple-bg);
-            color: var(--gray-800);
+            background: var(--page-bg);
+            color: var(--text-primary);
             line-height: 1.6;
             margin: 0;
             padding: 0;
+            transition: background 0.25s ease, color 0.25s ease;
         }
 
         .flex { display: flex; }
@@ -874,7 +921,7 @@
          }
 
                  /* Banner Image Styles */
-         .hero-section img {
+                 .hero-section img {
              max-width: 100%;
              height: auto;
              object-fit: cover;
@@ -882,7 +929,530 @@
              box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
          }
 
+        .top-action-bar {
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 0.8rem clamp(1rem, 4vw, 3rem);
+            background: var(--toolbar-bg);
+            border-bottom: 1px solid var(--toolbar-border);
+            backdrop-filter: blur(16px);
+            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+        }
+
+        .top-action-left,
+        .top-action-right {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            flex-wrap: wrap;
+        }
+
+        .top-action-btn,
+        .account-menu-btn,
+        .theme-toggle-btn {
+            min-height: 42px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.45rem;
+            border: 1px solid var(--toolbar-border);
+            border-radius: 8px;
+            background: var(--surface-bg);
+            color: var(--text-primary);
+            padding: 0.55rem 0.85rem;
+            font-weight: 700;
+            text-decoration: none;
+            cursor: pointer;
+            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+            transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease, color 0.16s ease;
+        }
+
+        .top-action-btn:hover,
+        .account-menu-btn:hover,
+        .theme-toggle-btn:hover {
+            transform: translateY(-1px);
+            border-color: var(--etrade-purple-light);
+            color: var(--etrade-purple-light);
+        }
+
+        .theme-toggle-btn {
+            width: 42px;
+            padding: 0;
+        }
+
+        .account-menu {
+            position: relative;
+        }
+
+        .account-dropdown {
+            position: absolute;
+            top: calc(100% + 0.6rem);
+            right: 0;
+            width: 190px;
+            display: none;
+            flex-direction: column;
+            padding: 0.5rem;
+            border: 1px solid var(--toolbar-border);
+            border-radius: 8px;
+            background: var(--surface-bg);
+            box-shadow: 0 18px 46px rgba(15, 23, 42, 0.22);
+        }
+
+        .account-menu.is-open .account-dropdown {
+            display: flex;
+        }
+
+        .account-dropdown a,
+        .account-dropdown button {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            padding: 0.7rem 0.75rem;
+            border-radius: 6px;
+            color: var(--text-primary);
+            background: transparent;
+            text-decoration: none;
+            font-weight: 700;
+            text-align: left;
+            cursor: pointer;
+        }
+
+        .account-dropdown a:hover,
+        .account-dropdown button:hover {
+            background: var(--surface-muted);
+            color: var(--etrade-purple-light);
+        }
+
+        .auth-gate {
+            position: fixed;
+            inset: 0;
+            z-index: 3000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            background: linear-gradient(135deg, rgba(36, 16, 86, 0.96) 0%, rgba(86, 39, 216, 0.92) 100%);
+        }
+
+        .auth-gate.is-visible {
+            display: flex;
+        }
+
+        .auth-card {
+            width: min(960px, 100%);
+            min-height: 560px;
+            display: grid;
+            grid-template-columns: minmax(0, 0.95fr) minmax(360px, 1.05fr);
+            overflow: hidden;
+            border-radius: 18px;
+            background: var(--surface-bg);
+            color: var(--text-primary);
+            box-shadow: 0 30px 90px rgba(0, 0, 0, 0.34);
+        }
+
+        .auth-visual {
+            padding: 3rem;
+            background: linear-gradient(155deg, #19112F 0%, #3B1E82 54%, #5B32E5 100%);
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .auth-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+            font-size: 1.6rem;
+            font-weight: 800;
+        }
+
+        .auth-brand img {
+            width: 56px;
+            height: 56px;
+            object-fit: contain;
+        }
+
+        .auth-visual h2 {
+            margin: 2rem 0 1rem;
+            font-size: 2.3rem;
+            line-height: 1.2;
+            color: #fff;
+        }
+
+        .auth-visual p {
+            color: rgba(255, 255, 255, 0.78);
+            font-size: 1rem;
+            margin: 0;
+        }
+
+        .auth-form-panel {
+            padding: 3rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            background: var(--surface-bg);
+        }
+
+        .auth-tabs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+            padding: 0.35rem;
+            margin-bottom: 1.5rem;
+            border-radius: 8px;
+            background: var(--surface-muted);
+        }
+
+        .auth-tab {
+            height: 44px;
+            border-radius: 7px;
+            background: transparent;
+            color: var(--text-secondary);
+            font-weight: 800;
+            cursor: pointer;
+        }
+
+        .auth-tab.is-active {
+            background: var(--surface-bg);
+            color: var(--etrade-purple-light);
+            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+        }
+
+        .auth-title {
+            margin: 0 0 0.25rem;
+            color: var(--text-primary);
+            font-size: 2rem;
+            font-weight: 850;
+        }
+
+        .auth-subtitle {
+            margin: 0 0 1.5rem;
+            color: var(--text-muted);
+        }
+
+        .auth-input-group {
+            margin-bottom: 1rem;
+        }
+
+        .auth-input-group label {
+            display: block;
+            margin-bottom: 0.45rem;
+            color: var(--text-secondary);
+            font-weight: 800;
+        }
+
+        .auth-input {
+            width: 100%;
+            height: 50px;
+            border: 2px solid var(--gray-200);
+            border-radius: 8px;
+            padding: 0 1rem;
+            background: var(--input-bg);
+            color: var(--text-primary);
+            font-size: 1rem;
+        }
+
+        .auth-primary-btn {
+            width: 100%;
+            height: 52px;
+            margin-top: 0.4rem;
+            border-radius: 8px;
+            background: linear-gradient(135deg, var(--etrade-purple-light), var(--etrade-purple));
+            color: #fff;
+            font-weight: 850;
+            cursor: pointer;
+            box-shadow: 0 12px 26px rgba(86, 39, 216, 0.28);
+        }
+
+        .auth-links {
+            display: flex;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .auth-links button {
+            background: transparent;
+            color: var(--etrade-purple-light);
+            font-weight: 750;
+            cursor: pointer;
+        }
+
+        .auth-message {
+            min-height: 28px;
+            margin-top: 0.9rem;
+            color: #B91C1C;
+            font-weight: 750;
+        }
+
+        .membership-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 2600;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            background: rgba(8, 11, 20, 0.58);
+            backdrop-filter: blur(10px);
+        }
+
+        .membership-modal.is-visible {
+            display: flex;
+        }
+
+        .membership-card {
+            width: min(980px, 100%);
+            max-height: calc(100vh - 4rem);
+            overflow: auto;
+            border-radius: 14px;
+            background: var(--surface-bg);
+            color: var(--text-primary);
+            box-shadow: 0 30px 90px rgba(0, 0, 0, 0.32);
+            padding: 2rem;
+        }
+
+        .membership-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .membership-header h2 {
+            margin: 0;
+            color: var(--text-primary);
+            font-size: 1.8rem;
+        }
+
+        .modal-close-btn {
+            width: 42px;
+            height: 42px;
+            border-radius: 8px;
+            background: var(--surface-muted);
+            color: var(--text-primary);
+            cursor: pointer;
+        }
+
+        .membership-plans {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 1rem;
+        }
+
+        .membership-plan {
+            border: 2px solid var(--gray-200);
+            border-radius: 12px;
+            padding: 1.25rem;
+            background: var(--surface-muted);
+        }
+
+        .membership-plan h3 {
+            margin: 0 0 0.5rem;
+            color: var(--etrade-purple);
+            font-size: 1.35rem;
+        }
+
+        .membership-price {
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+            font-size: 1.6rem;
+            font-weight: 850;
+        }
+
+        .qr-box {
+            height: 150px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px dashed var(--gray-400);
+            border-radius: 10px;
+            background: var(--surface-bg);
+            color: var(--text-secondary);
+            font-size: 1.35rem;
+            font-weight: 850;
+        }
+
+        :root[data-theme="dark"] .auth-card,
+        :root[data-theme="dark"] .auth-form-panel,
+        :root[data-theme="dark"] .membership-card {
+            background: var(--surface-bg);
+        }
+
+        :root[data-theme="dark"] .auth-input,
+        :root[data-theme="dark"] .qr-box {
+            background: var(--input-bg);
+            border-color: var(--gray-300);
+        }
+
+        :root[data-theme="dark"] .auth-message {
+            color: #FCA5A5;
+        }
+
+        #llmProviderSelect {
+            scroll-margin-top: 110px;
+        }
+
+        .analysis-loading-card {
+            width: min(760px, 100%);
+            margin: 1rem auto 0;
+            padding: 1.1rem 1.25rem;
+            border: 1px solid var(--gray-200);
+            border-radius: 12px;
+            background: var(--surface-bg);
+            color: var(--text-primary);
+            box-shadow: var(--panel-shadow);
+            text-align: left;
+        }
+
+        .analysis-progress-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 0.75rem;
+            font-weight: 800;
+        }
+
+        .analysis-progress-track {
+            height: 12px;
+            overflow: hidden;
+            border-radius: 999px;
+            background: var(--gray-200);
+        }
+
+        .analysis-progress-fill {
+            width: 0%;
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, #38BDF8, var(--etrade-purple-light), #22C55E);
+            transition: width 0.6s ease;
+        }
+
+        .analysis-loading-note {
+            margin-top: 0.75rem;
+            color: var(--text-secondary);
+            font-weight: 700;
+        }
+
+        :root[data-theme="dark"] .analysis-loading-card {
+            background: var(--surface-bg);
+            border-color: var(--gray-300);
+        }
+
+        :root[data-theme="dark"] .hero-section {
+            background: linear-gradient(135deg, #101725 0%, #281B64 58%, #4338CA 100%);
+        }
+
+        :root[data-theme="dark"] .form-container,
+        :root[data-theme="dark"] .form-section,
+        :root[data-theme="dark"] .panel,
+        :root[data-theme="dark"] .security-panel {
+            background: var(--surface-bg);
+            color: var(--text-primary);
+            box-shadow: var(--panel-shadow);
+        }
+
+        :root[data-theme="dark"] .form-container {
+            box-shadow: var(--soft-shadow);
+        }
+
+        :root[data-theme="dark"] .form-control,
+        :root[data-theme="dark"] .form-select,
+        :root[data-theme="dark"] select,
+        :root[data-theme="dark"] input {
+            background: var(--input-bg);
+            color: var(--text-primary);
+            border-color: var(--gray-300);
+        }
+
+        :root[data-theme="dark"] .form-control::placeholder,
+        :root[data-theme="dark"] input::placeholder {
+            color: var(--text-muted);
+        }
+
+        :root[data-theme="dark"] .asset-btn,
+        :root[data-theme="dark"] .timeframe-btn,
+        :root[data-theme="dark"] .data-source-btn,
+        :root[data-theme="dark"] .security-item,
+        :root[data-theme="dark"] #activeApiKeyDisplay {
+            background: var(--surface-muted);
+            color: var(--text-primary);
+            border-color: var(--gray-300);
+        }
+
+        :root[data-theme="dark"] .security-panel {
+            background: #171A23;
+        }
+
+        :root[data-theme="dark"] .security-content p,
+        :root[data-theme="dark"] .chart-description,
+        :root[data-theme="dark"] .form-label,
+        :root[data-theme="dark"] .form-check-label {
+            color: var(--text-secondary) !important;
+        }
+
+        :root[data-theme="dark"] .alert-info {
+            background: rgba(59, 130, 246, 0.14);
+            color: #BFDBFE;
+            border-color: rgba(96, 165, 250, 0.45);
+        }
+
+        :root[data-theme="dark"] .alert-danger {
+            background: rgba(239, 68, 68, 0.13);
+            color: #FECACA;
+            border-color: rgba(248, 113, 113, 0.45);
+        }
+
+        :root[data-theme="dark"] .alert-success {
+            background: rgba(34, 197, 94, 0.14);
+            color: #BBF7D0;
+            border-color: rgba(74, 222, 128, 0.45);
+        }
+
          @media (max-width: 768px) {
+             .top-action-bar {
+                 align-items: flex-start;
+                 flex-direction: column;
+             }
+
+             .top-action-left,
+             .top-action-right {
+                 width: 100%;
+             }
+
+             .top-action-btn {
+                 flex: 1 1 9rem;
+             }
+
+             .top-action-right {
+                 justify-content: flex-end;
+             }
+
+             .auth-card {
+                 grid-template-columns: 1fr;
+             }
+
+             .auth-visual {
+                 display: none;
+             }
+
+             .auth-form-panel {
+                 padding: 2rem 1.2rem;
+             }
+
+             .membership-plans {
+                 grid-template-columns: 1fr;
+             }
+
              .col-md-6, .col-md-4 { flex: 0 0 100%; max-width: 100%; }
              .form-container { margin: 1rem; border-radius: 16px; }
              .form-section, .results-section { padding: 2rem 1rem; }
@@ -924,6 +1494,92 @@
 </head>
 
 <body>
+    <nav class="top-action-bar" aria-label="QuantAgent shortcuts">
+        <div class="top-action-left">
+            <a class="top-action-btn" href="#analysis"><i class="fas fa-database"></i> 数据</a>
+            <a class="top-action-btn" href="#llmProviderSelect" onclick="focusModelProvider(event)"><i class="fas fa-robot"></i> 模型</a>
+            <a class="top-action-btn" href="#security-panel"><i class="fas fa-shield-alt"></i> 安全</a>
+        </div>
+        <div class="top-action-right">
+            <button class="theme-toggle-btn" type="button" id="themeToggleBtn" onclick="toggleQuantAgentTheme()" title="切换背景颜色">
+                <i class="fas fa-moon"></i>
+            </button>
+            <div class="account-menu" id="accountMenu">
+                <button class="account-menu-btn" type="button" onclick="toggleAccountMenu(event)">
+                    <i class="fas fa-user-circle"></i> 我的 <i class="fas fa-chevron-down"></i>
+                </button>
+                <div class="account-dropdown" role="menu">
+                    <button type="button" role="menuitem" onclick="openMembershipModal()"><i class="fas fa-crown"></i> 会员</button>
+                    <a href="#settings-panel" role="menuitem"><i class="fas fa-sliders-h"></i> 账户设置</a>
+                    <button type="button" role="menuitem" onclick="handleLogoutAction()"><i class="fas fa-sign-out-alt"></i> 退出登录</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="auth-gate" id="authGate" aria-modal="true" role="dialog">
+        <div class="auth-card">
+            <div class="auth-visual">
+                <div class="auth-brand">
+                    <img src="/static/assets/darklogo.png" alt="QuantAgent">
+                    <span>QuantAgent</span>
+                </div>
+                <div>
+                    <h2>欢迎回来</h2>
+                    <p>登录后继续使用行情分析、AI 模型设置和本地安全配置。</p>
+                </div>
+                <p>智能分析 · 本地运行 · 演示会员</p>
+            </div>
+            <div class="auth-form-panel">
+                <div class="auth-tabs">
+                    <button class="auth-tab is-active" id="loginTab" type="button" onclick="setAuthMode('login')">登录</button>
+                    <button class="auth-tab" id="registerTab" type="button" onclick="setAuthMode('register')">注册</button>
+                </div>
+                <h2 class="auth-title" id="authTitle">登录 QuantAgent</h2>
+                <p class="auth-subtitle" id="authSubtitle">使用手机号和密码进入工作台</p>
+                <div class="auth-input-group">
+                    <label for="authPhoneInput">手机号</label>
+                    <input class="auth-input" id="authPhoneInput" maxlength="11" inputmode="numeric" value="12312341234">
+                </div>
+                <div class="auth-input-group">
+                    <label for="authPasswordInput">密码</label>
+                    <input class="auth-input" id="authPasswordInput" type="password" value="123456">
+                </div>
+                <button class="auth-primary-btn" id="authSubmitBtn" type="button" onclick="submitAuthForm()">登录</button>
+                <div class="auth-links">
+                    <button type="button" onclick="setAuthMode('register')">立即注册</button>
+                    <button type="button" onclick="showForgotPassword()">找回密码</button>
+                </div>
+                <div class="auth-message" id="authMessage"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="membership-modal" id="membershipModal" aria-modal="true" role="dialog">
+        <div class="membership-card">
+            <div class="membership-header">
+                <h2><i class="fas fa-crown"></i> 会员中心</h2>
+                <button class="modal-close-btn" type="button" onclick="closeMembershipModal()"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="membership-plans">
+                <div class="membership-plan">
+                    <h3>1 个月</h3>
+                    <div class="membership-price">仅演示</div>
+                    <div class="qr-box">二维码</div>
+                </div>
+                <div class="membership-plan">
+                    <h3>3 个月</h3>
+                    <div class="membership-price">仅演示</div>
+                    <div class="qr-box">二维码</div>
+                </div>
+                <div class="membership-plan">
+                    <h3>一年</h3>
+                    <div class="membership-price">仅演示</div>
+                    <div class="qr-box">二维码</div>
+                </div>
+            </div>
+        </div>
+    </div>
     <!-- Page wrapper -->
     <div class="flex flex-col min-h-screen overflow-hidden">
 
@@ -995,7 +1651,7 @@
                         
                         <!-- Panel 1: Data Selection -->
                         <div class="panel-group">
-                            <div class="panel">
+                            <div class="panel" id="settings-panel">
                                 <h4 class="panel-title">
                                     <i class="fas fa-database"></i> 数据选择
                                 </h4>
@@ -1178,6 +1834,7 @@
                                         <option value="anthropic">Claude (Anthropic)</option>
                                         <option value="qwen">通义千问 (Qwen)</option>
                                         <option value="minimax">MiniMax</option>
+                                        <option value="sohu">搜狐大模型</option>
                                     </select>
                                 </div>
                                 
@@ -1186,7 +1843,7 @@
                                     <label class="form-label">OpenAI API 密钥</label>
                                     <div class="input-group">
                                         <input type="password" class="form-control" id="openaiApiKeyInput" placeholder="输入您的 OpenAI API 密钥">
-                                        <button class="btn btn-outline-primary" type="button" onclick="updateApiKey('openai')">
+                                        <button class="btn btn-outline-primary" type="button" onclick="updateApiKey('openai', this)">
                                             <i class="fas fa-save"></i> 更新
                                         </button>
                                     </div>
@@ -1197,7 +1854,7 @@
                                     <label class="form-label">Anthropic API 密钥</label>
                                     <div class="input-group">
                                         <input type="password" class="form-control" id="anthropicApiKeyInput" placeholder="输入您的 Anthropic API 密钥">
-                                        <button class="btn btn-outline-primary" type="button" onclick="updateApiKey('anthropic')">
+                                        <button class="btn btn-outline-primary" type="button" onclick="updateApiKey('anthropic', this)">
                                             <i class="fas fa-save"></i> 更新
                                         </button>
                                     </div>
@@ -1208,7 +1865,7 @@
                                     <label class="form-label">Qwen API 密钥（Dashscope）</label>
                                     <div class="input-group">
                                         <input type="password" class="form-control" id="qwenApiKeyInput" placeholder="输入您的 Qwen API 密钥（Dashscope）">
-                                        <button class="btn btn-outline-primary" type="button" onclick="updateApiKey('qwen')">
+                                        <button class="btn btn-outline-primary" type="button" onclick="updateApiKey('qwen', this)">
                                             <i class="fas fa-save"></i> 更新
                                         </button>
                                     </div>
@@ -1219,8 +1876,29 @@
                                     <label class="form-label">MiniMax API 密钥</label>
                                     <div class="input-group">
                                         <input type="password" class="form-control" id="minimaxApiKeyInput" placeholder="输入您的 MiniMax API 密钥">
-                                        <button class="btn btn-outline-primary" type="button" onclick="updateApiKey('minimax')">
+                                        <button class="btn btn-outline-primary" type="button" onclick="updateApiKey('minimax', this)">
                                             <i class="fas fa-save"></i> 更新
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Sohu API Key Input -->
+                                <div class="form-group" id="sohuApiKeyGroup" style="display: none;">
+                                    <label class="form-label">搜狐大模型 API 密钥</label>
+                                    <div class="input-group">
+                                        <input type="password" class="form-control" id="sohuApiKeyInput" placeholder="输入您的搜狐大模型 API 密钥">
+                                        <button class="btn btn-outline-primary" type="button" onclick="updateApiKey('sohu', this)">
+                                            <i class="fas fa-save"></i> 更新
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="form-group" style="margin-top: 1rem;">
+                                    <label class="form-label">正在使用</label>
+                                    <div class="input-group">
+                                        <div class="form-control" id="activeApiKeyDisplay" style="display: flex; align-items: center; overflow-wrap: anywhere;">未设置 API Key</div>
+                                        <button class="btn btn-outline-primary" id="toggleApiKeyVisibilityBtn" type="button" onclick="toggleActiveApiKeyVisibility(this)" title="显示完整 API Key" disabled>
+                                            <i class="fas fa-eye"></i>
                                         </button>
                                     </div>
                                 </div>
@@ -1241,7 +1919,7 @@
                             </div>
                             
                             <!-- Security Information Panel -->
-                            <div class="panel security-panel">
+                            <div class="panel security-panel" id="security-panel">
                                 <h4 class="panel-title">
                                     <i class="fas fa-shield-alt"></i> 安全信息
                                 </h4>
@@ -1279,6 +1957,20 @@
                             <button class="btn btn-primary btn-lg" id="analyzeBtn" onclick="runAnalysis()" style="padding: 1.5rem 3rem; font-size: 1.3rem; border-radius: 15px;">
                                 <i class="fas fa-play"></i> 开始分析
                             </button>
+                            <button class="btn btn-outline-primary btn-lg" id="returnReportBtn" onclick="returnToLastReport()" style="display: none; margin-left: 1rem; padding: 1.5rem 2rem; font-size: 1.1rem; border-radius: 15px;">
+                                <i class="fas fa-file-alt"></i> 返回上次报告
+                            </button>
+                            <div id="analysisStatus" class="alert mt-2" role="status" style="display: none; max-width: 760px; margin: 1rem auto 0;"></div>
+                            <div class="analysis-loading-card" id="analysisLoadingCard" style="display: none;">
+                                <div class="analysis-progress-header">
+                                    <span id="analysisLoadingText">正在初始化分析任务...</span>
+                                    <span id="analysisProgressText">0%</span>
+                                </div>
+                                <div class="analysis-progress-track">
+                                    <div class="analysis-progress-fill" id="analysisProgressFill"></div>
+                                </div>
+                                <div class="analysis-loading-note" id="analysisLoadingNote">正在连接数据源</div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1289,9 +1981,124 @@
     </div>
 
     <script>
+        function ensureAuthGate() {
+            const gate = document.getElementById('authGate');
+            if (!gate) return;
+            const loggedIn = localStorage.getItem('quantagent_auth') === 'true';
+            gate.classList.toggle('is-visible', !loggedIn);
+        }
+
+        function setAuthMode(mode) {
+            const isRegister = mode === 'register';
+            document.getElementById('loginTab')?.classList.toggle('is-active', !isRegister);
+            document.getElementById('registerTab')?.classList.toggle('is-active', isRegister);
+            document.getElementById('authTitle').textContent = isRegister ? '创建账号' : '登录 QuantAgent';
+            document.getElementById('authSubtitle').textContent = isRegister ? '输入手机号和密码完成演示注册' : '使用手机号和密码进入工作台';
+            document.getElementById('authSubmitBtn').textContent = isRegister ? '注册并进入' : '登录';
+            document.getElementById('authSubmitBtn').dataset.mode = mode;
+            document.getElementById('authMessage').textContent = '';
+        }
+
+        function submitAuthForm() {
+            const phone = document.getElementById('authPhoneInput').value.trim();
+            const password = document.getElementById('authPasswordInput').value;
+            const message = document.getElementById('authMessage');
+            if (!/^\d{11}$/.test(phone)) {
+                message.textContent = '请输入 11 位手机号';
+                return;
+            }
+            if (password.length < 6) {
+                message.textContent = '密码长度至少 6 位';
+                return;
+            }
+            localStorage.setItem('quantagent_auth', 'true');
+            localStorage.setItem('quantagent_phone', phone);
+            document.getElementById('authGate').classList.remove('is-visible');
+        }
+
+        function showForgotPassword() {
+            document.getElementById('authTitle').textContent = '找回密码';
+            document.getElementById('authSubtitle').textContent = '输入手机号即可继续，当前为演示流程';
+            document.getElementById('authSubmitBtn').textContent = '验证并进入';
+            document.getElementById('authSubmitBtn').dataset.mode = 'forgot';
+            document.getElementById('loginTab')?.classList.remove('is-active');
+            document.getElementById('registerTab')?.classList.remove('is-active');
+            document.getElementById('authMessage').textContent = '';
+        }
+
+        function openMembershipModal() {
+            document.getElementById('accountMenu')?.classList.remove('is-open');
+            document.getElementById('membershipModal')?.classList.add('is-visible');
+        }
+
+        function closeMembershipModal() {
+            document.getElementById('membershipModal')?.classList.remove('is-visible');
+        }
+
+        function applyQuantAgentTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('quantagent_theme', theme);
+            const button = document.getElementById('themeToggleBtn');
+            if (button) {
+                const isDark = theme === 'dark';
+                button.title = isDark ? '切换浅色背景' : '切换深色背景';
+                button.querySelector('i').className = isDark ? 'fas fa-sun' : 'fas fa-moon';
+            }
+        }
+
+        function toggleQuantAgentTheme() {
+            const current = document.documentElement.getAttribute('data-theme') || 'light';
+            applyQuantAgentTheme(current === 'dark' ? 'light' : 'dark');
+        }
+
+        function toggleAccountMenu(event) {
+            event.stopPropagation();
+            document.getElementById('accountMenu')?.classList.toggle('is-open');
+        }
+
+        function handleLogoutAction() {
+            document.getElementById('accountMenu')?.classList.remove('is-open');
+            localStorage.removeItem('quantagent_auth');
+            ensureAuthGate();
+        }
+
+        document.addEventListener('click', function (event) {
+            const menu = document.getElementById('accountMenu');
+            if (menu && !menu.contains(event.target)) {
+                menu.classList.remove('is-open');
+            }
+        });
+
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape') {
+                document.getElementById('accountMenu')?.classList.remove('is-open');
+                closeMembershipModal();
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', function () {
+            applyQuantAgentTheme(localStorage.getItem('quantagent_theme') || 'light');
+            setAuthMode('login');
+            ensureAuthGate();
+            updateReturnReportButton();
+        });
+
         // Global variables
         let currentAsset = '';
         let currentTimeframe = '';
+        let activeApiKeyRevealed = false;
+        let analysisProgressTimer = null;
+        let analysisTipTimer = null;
+        let analysisProgress = 0;
+        const ANALYSIS_CACHE_KEY = 'quantagent_last_analysis_results';
+        const analysisTips = [
+            '正在连接数据源',
+            '正在整理 K 线和技术指标',
+            '正在生成多智能体分析任务',
+            '正在等待 AI 模型返回结果',
+            '正在汇总交易决策和图表',
+            '分析时间较长时请保持窗口打开'
+        ];
         
         // Persisted state keys
         const STORAGE_KEYS = {
@@ -1299,6 +2106,89 @@
             SELECTED_ASSET: 'quantagent_selected_asset',
             SELECTED_TIMEFRAME: 'quantagent_selected_timeframe'
         };
+
+        function focusModelProvider(event) {
+            event.preventDefault();
+            const select = document.getElementById('llmProviderSelect');
+            if (!select) return;
+            select.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setTimeout(() => {
+                select.focus();
+                select.style.boxShadow = '0 0 0 4px rgba(86, 39, 216, 0.25)';
+                setTimeout(() => {
+                    select.style.boxShadow = '';
+                }, 1400);
+            }, 450);
+        }
+
+        function updateReturnReportButton() {
+            const button = document.getElementById('returnReportBtn');
+            if (!button) return;
+            button.style.display = localStorage.getItem(ANALYSIS_CACHE_KEY) ? 'inline-flex' : 'none';
+        }
+
+        function returnToLastReport() {
+            const cached = localStorage.getItem(ANALYSIS_CACHE_KEY);
+            if (!cached) {
+                showAnalysisStatus('还没有可返回的分析报告，请先运行一次分析。', 'warning');
+                return;
+            }
+            sessionStorage.setItem('analysisResults', cached);
+            window.location.href = '/output';
+        }
+
+        function startAnalysisLoading() {
+            stopAnalysisLoading(false);
+            analysisProgress = 4;
+            const card = document.getElementById('analysisLoadingCard');
+            const fill = document.getElementById('analysisProgressFill');
+            const text = document.getElementById('analysisProgressText');
+            const loadingText = document.getElementById('analysisLoadingText');
+            const note = document.getElementById('analysisLoadingNote');
+            if (!card || !fill || !text || !loadingText || !note) return;
+
+            card.style.display = 'block';
+            fill.style.width = '4%';
+            text.textContent = '4%';
+            loadingText.textContent = '正在分析，请稍候...';
+            note.textContent = analysisTips[0];
+
+            let tipIndex = 0;
+            analysisTipTimer = setInterval(() => {
+                tipIndex = (tipIndex + 1) % analysisTips.length;
+                note.textContent = analysisTips[tipIndex];
+            }, 3200);
+
+            analysisProgressTimer = setInterval(() => {
+                const nextLimit = analysisProgress < 55 ? 4 : analysisProgress < 78 ? 2 : 1;
+                analysisProgress = Math.min(92, analysisProgress + nextLimit);
+                fill.style.width = `${analysisProgress}%`;
+                text.textContent = `${analysisProgress}%`;
+            }, 1800);
+        }
+
+        function stopAnalysisLoading(complete) {
+            if (analysisProgressTimer) clearInterval(analysisProgressTimer);
+            if (analysisTipTimer) clearInterval(analysisTipTimer);
+            analysisProgressTimer = null;
+            analysisTipTimer = null;
+
+            const card = document.getElementById('analysisLoadingCard');
+            const fill = document.getElementById('analysisProgressFill');
+            const text = document.getElementById('analysisProgressText');
+            const loadingText = document.getElementById('analysisLoadingText');
+            if (!card || !fill || !text || !loadingText) return;
+
+            if (complete) {
+                fill.style.width = '100%';
+                text.textContent = '100%';
+                loadingText.textContent = '分析完成，正在打开报告...';
+            } else {
+                card.style.display = 'none';
+                fill.style.width = '0%';
+                text.textContent = '0%';
+            }
+        }
 
         // Add or render a custom asset button into the grid
         function addCustomAssetButton(symbol, isServerLoaded = false) {
@@ -1621,14 +2511,13 @@
                 }
             });
             
-            // Check API key status on page load
-            checkApiKeyStatus();
-            
             // Set initial provider dropdown state
             const savedProvider = localStorage.getItem('quantagent_provider') || 'openai';
             if (savedProvider) {
                 document.getElementById('llmProviderSelect').value = savedProvider;
                 handleProviderChange();
+            } else {
+                checkApiKeyStatus();
             }
         });
         
@@ -1646,7 +2535,8 @@
                         'openai': 'OpenAI',
                         'anthropic': 'Anthropic',
                         'qwen': 'Qwen',
-                        'minimax': 'MiniMax'
+                        'minimax': 'MiniMax',
+                        'sohu': '搜狐大模型'
                     };
                     const providerName = providerNames[provider] || provider;
                     
@@ -1659,8 +2549,12 @@
                             showApiKeyError(`API 密钥检查出错：${data.error}`);
                         }
                     } else if (data.has_key) {
+                        activeApiKeyRevealed = false;
+                        updateActiveApiKeyDisplay(data.masked_key, true);
                         showApiKeyStatus(`${providerName} API 密钥已设置：${data.masked_key}`);
                     } else {
+                        activeApiKeyRevealed = false;
+                        updateActiveApiKeyDisplay('未设置 API Key', false);
                         showApiKeyError(`No ${providerName} API key found. Please enter your ${providerName} API key.`);
                     }
                 })
@@ -1668,6 +2562,32 @@
                     console.error('Error checking API key status:', error);
                     // Silently fail - don't show error to user
                 });
+        }
+
+        function updateActiveApiKeyDisplay(value, hasKey) {
+            document.getElementById('activeApiKeyDisplay').textContent = value;
+            const button = document.getElementById('toggleApiKeyVisibilityBtn');
+            button.disabled = !hasKey;
+            button.title = activeApiKeyRevealed ? '隐藏完整 API Key' : '显示完整 API Key';
+            button.querySelector('i').className = activeApiKeyRevealed ? 'fas fa-eye-slash' : 'fas fa-eye';
+        }
+
+        function toggleActiveApiKeyVisibility() {
+            if (activeApiKeyRevealed) {
+                checkApiKeyStatus();
+                return;
+            }
+            const provider = document.getElementById('llmProviderSelect')?.value || 'openai';
+            fetch(`/api/get-api-key-status?provider=${provider}&reveal=1`)
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.has_key || !data.api_key) {
+                        throw new Error('当前 Provider 未设置 API Key');
+                    }
+                    activeApiKeyRevealed = true;
+                    updateActiveApiKeyDisplay(data.api_key, true);
+                })
+                .catch(error => showApiKeyError(error.message));
         }
         
                  // Global variables
@@ -1801,6 +2721,8 @@
              const originalText = analyzeBtn.innerHTML;
              analyzeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 分析中...';
              analyzeBtn.disabled = true;
+             showAnalysisStatus('正在获取行情数据并运行分析，请稍候...', 'info');
+             startAnalysisLoading();
              
              // Prepare request data
              const requestData = {
@@ -1816,44 +2738,82 @@
              };
              
              // Make API call
-             fetch('/api/analyze', {
+             fetch('/api/analyze/start', {
                  method: 'POST',
                  headers: {
                      'Content-Type': 'application/json',
                  },
                  body: JSON.stringify(requestData)
              })
-             .then(response => response.json())
-            .then(data => {
-                if (data.redirect) {
-                    // Store full results (with images) in sessionStorage before redirect
-                    if (data.full_results) {
-                        sessionStorage.setItem('analysisResults', JSON.stringify(data.full_results));
-                    }
-                    // Redirect to output page with results
-                    window.location.href = data.redirect;
-                 } else if (data.error) {
-                     // Show error message
-                     alert('分析失败：' + data.error);
-                     // Reset button
-                     analyzeBtn.innerHTML = originalText;
-                     analyzeBtn.disabled = false;
-                 } else {
-                     // Handle other responses
-                     console.log('Analysis completed:', data);
-                     alert('分析成功完成！');
-                     // Reset button
-                     analyzeBtn.innerHTML = originalText;
-                     analyzeBtn.disabled = false;
+             .then(response => response.json().then(data => ({ ok: response.ok, data })))
+             .then(({ ok, data }) => {
+                 if (!ok || !data.job_id) {
+                     throw new Error(data.error || '无法启动分析任务');
                  }
+                 pollAnalysisJob(data.job_id, analyzeBtn, originalText);
              })
              .catch(error => {
                  console.error('Error:', error);
-                 alert('分析过程中发生错误，请重试。');
-                 // Reset button
+                 showAnalysisStatus('分析过程中发生错误：' + error.message, 'danger');
+                 stopAnalysisLoading(false);
                  analyzeBtn.innerHTML = originalText;
                  analyzeBtn.disabled = false;
              });
+        }
+
+        function pollAnalysisJob(jobId, analyzeBtn, originalText) {
+            fetch(`/api/analyze/status/${jobId}`)
+                .then(response => response.json().then(data => ({ ok: response.ok, data })))
+                .then(({ ok, data }) => {
+                    if (!ok) {
+                        throw new Error(data.error || '无法查询分析进度');
+                    }
+                    if (data.status === 'running') {
+                        setTimeout(() => pollAnalysisJob(jobId, analyzeBtn, originalText), 1000);
+                        return;
+                    }
+                    if (data.status === 'failed') {
+                        throw new Error(data.error || '分析任务失败');
+                    }
+                    handleAnalysisResult(data.result || {}, analyzeBtn, originalText);
+                })
+                .catch(error => {
+                    console.error('Analysis polling error:', error);
+                    showAnalysisStatus('分析失败：' + error.message, 'danger');
+                    stopAnalysisLoading(false);
+                    analyzeBtn.innerHTML = originalText;
+                    analyzeBtn.disabled = false;
+                });
+        }
+
+        function handleAnalysisResult(data, analyzeBtn, originalText) {
+            if (data.redirect) {
+                if (data.full_results) {
+                    const serializedResults = JSON.stringify(data.full_results);
+                    sessionStorage.setItem('analysisResults', serializedResults);
+                    localStorage.setItem(ANALYSIS_CACHE_KEY, serializedResults);
+                    updateReturnReportButton();
+                }
+                stopAnalysisLoading(true);
+                window.location.href = data.redirect;
+                return;
+            }
+            if (data.error) {
+                showAnalysisStatus('分析失败：' + data.error, 'danger');
+                stopAnalysisLoading(false);
+            } else {
+                showAnalysisStatus('分析成功完成！', 'success');
+                stopAnalysisLoading(true);
+            }
+            analyzeBtn.innerHTML = originalText;
+            analyzeBtn.disabled = false;
+        }
+
+        function showAnalysisStatus(message, type) {
+            const status = document.getElementById('analysisStatus');
+            status.className = `alert alert-${type} mt-2`;
+            status.textContent = message;
+            status.style.display = 'block';
         }
         
         function handleUseCurrentTimeChange() {
@@ -1934,12 +2894,14 @@
              const anthropicGroup = document.getElementById('anthropicApiKeyGroup');
              const qwenGroup = document.getElementById('qwenApiKeyGroup');
              const minimaxGroup = document.getElementById('minimaxApiKeyGroup');
+             const sohuGroup = document.getElementById('sohuApiKeyGroup');
 
              // Hide all groups first
              openaiGroup.style.display = 'none';
              anthropicGroup.style.display = 'none';
              qwenGroup.style.display = 'none';
              minimaxGroup.style.display = 'none';
+             sohuGroup.style.display = 'none';
 
              // Show the selected provider's group
              if (provider === 'openai') {
@@ -1950,6 +2912,8 @@
                  qwenGroup.style.display = 'block';
              } else if (provider === 'minimax') {
                  minimaxGroup.style.display = 'block';
+             } else if (provider === 'sohu') {
+                 sohuGroup.style.display = 'block';
              }
              
              // Update provider on backend
@@ -1970,8 +2934,11 @@
                  },
                  body: JSON.stringify({ provider: provider })
              })
-             .then(response => response.json())
-             .then(data => {
+             .then(response => response.json().then(data => ({ ok: response.ok, status: response.status, data })))
+             .then(({ ok, status, data }) => {
+                 if (!ok) {
+                     throw new Error(data.error || `HTTP ${status}`);
+                 }
                  if (data.success) {
                      console.log(`Provider switched to ${provider}`);
                  } else {
@@ -1983,7 +2950,7 @@
              });
          }
          
-         function updateApiKey(provider) {
+         function updateApiKey(provider, updateBtn) {
              const providerSelect = document.getElementById('llmProviderSelect');
              const actualProvider = provider || providerSelect.value;
              
@@ -1996,6 +2963,8 @@
                  apiKey = document.getElementById('qwenApiKeyInput').value.trim();
              } else if (actualProvider === 'minimax') {
                  apiKey = document.getElementById('minimaxApiKeyInput').value.trim();
+             } else if (actualProvider === 'sohu') {
+                 apiKey = document.getElementById('sohuApiKeyInput').value.trim();
              }
              
              if (!apiKey) {
@@ -2007,7 +2976,6 @@
              hideApiKeyMessages();
              
              // Show loading state
-             const updateBtn = event.target.closest('button');
              const originalText = updateBtn.innerHTML;
              updateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 更新中...';
              updateBtn.disabled = true;
@@ -2023,14 +2991,18 @@
                      provider: actualProvider
                  })
              })
-             .then(response => response.json())
-             .then(data => {
+             .then(response => response.json().then(data => ({ ok: response.ok, status: response.status, data })))
+             .then(({ ok, status, data }) => {
+                 if (!ok) {
+                     throw new Error(data.error || `HTTP ${status}`);
+                 }
                  if (data.success) {
                      const providerNames = {
                          'openai': 'OpenAI',
                          'anthropic': 'Anthropic',
                          'qwen': 'Qwen',
-                         'minimax': 'MiniMax'
+                         'minimax': 'MiniMax',
+                         'sohu': '搜狐大模型'
                      };
                      showApiKeySuccess(`${providerNames[actualProvider] || actualProvider} API 密钥更新成功！`);
                      if (actualProvider === 'openai') {
@@ -2041,6 +3013,8 @@
                          document.getElementById('qwenApiKeyInput').value = '';
                      } else if (actualProvider === 'minimax') {
                          document.getElementById('minimaxApiKeyInput').value = '';
+                     } else if (actualProvider === 'sohu') {
+                         document.getElementById('sohuApiKeyInput').value = '';
                      }
                      checkApiKeyStatus();
                  } else {
@@ -2049,7 +3023,10 @@
              })
              .catch(error => {
                  console.error('Error:', error);
-                 showApiKeyError('API 密钥更新时发生错误');
+                 const message = error.message === 'Load failed' || error.message === 'Failed to fetch'
+                     ? '无法连接本地后端，请完全退出并重新打开 QuantAgent。'
+                     : `API 密钥更新失败：${error.message}`;
+                 showApiKeyError(message);
              })
              .finally(() => {
                  // Reset button

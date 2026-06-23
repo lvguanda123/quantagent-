@@ -68,6 +68,30 @@ def create_pattern_agent(tool_llm, graph_llm, toolkit):
         # --- Check for precomputed image in state ---
         pattern_image_b64 = state.get("pattern_image")
 
+        if (getattr(graph_llm, "metadata", {}) or {}).get("quantagent_provider") == "sohu":
+            compact_data = {
+                key: value[-12:] if isinstance(value, list) else value
+                for key, value in state["kline_data"].items()
+            }
+            response = graph_llm.invoke(
+                [
+                    SystemMessage(
+                        content="你是K线形态分析助手。请使用中文判断主要形态、方向和风险。"
+                    ),
+                    HumanMessage(
+                        content=(
+                            f"周期：{time_frame}\n"
+                            f"最近12根OHLC：\n{json.dumps(compact_data, ensure_ascii=False)}\n"
+                            "请判断是否存在双底、双顶、突破、反转或整理形态；没有明确形态时请直说。"
+                        )
+                    ),
+                ]
+            )
+            return {
+                "messages": [response],
+                "pattern_report": response.content,
+            }
+
         # --- Retry wrapper for LLM invocation ---
         def invoke_with_retry(call_fn, *args, retries=3, wait_sec=8):
             for attempt in range(retries):

@@ -58,6 +58,32 @@ def create_trend_agent(tool_llm, graph_llm, toolkit):
 
         messages = []
 
+        if (getattr(graph_llm, "metadata", {}) or {}).get("quantagent_provider") == "sohu":
+            compact_data = {
+                key: value[-12:] if isinstance(value, list) else value
+                for key, value in state["kline_data"].items()
+            }
+            response = graph_llm.invoke(
+                [
+                    SystemMessage(
+                        content="你是K线趋势分析助手。请使用中文判断上涨、下跌或震荡趋势，并说明依据。"
+                    ),
+                    HumanMessage(
+                        content=(
+                            f"周期：{time_frame}\n"
+                            f"最近12根OHLC：\n{json.dumps(compact_data, ensure_ascii=False)}"
+                        )
+                    ),
+                ]
+            )
+            return {
+                "messages": [response],
+                "trend_report": response.content,
+                "trend_image": trend_image_b64,
+                "trend_image_filename": "trend_graph.png",
+                "trend_image_description": "Trend chart generated locally",
+            }
+
         # --- If no precomputed image, fall back to tool generation ---
         if not trend_image_b64:
             print("No precomputed trend image found in state, generating with tool...")

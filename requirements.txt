@@ -1,4 +1,6 @@
 flask
+waitress
+akshare
 yfinance
 pandas
 numpy

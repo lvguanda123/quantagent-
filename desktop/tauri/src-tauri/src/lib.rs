@@ -25,6 +25,20 @@ struct StartupLogs {
     stderr: PathBuf,
 }
 
+struct PythonCommand {
+    program: String,
+    args: Vec<String>,
+}
+
+impl PythonCommand {
+    fn display(&self) -> String {
+        std::iter::once(self.program.as_str())
+            .chain(self.args.iter().map(String::as_str))
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -61,7 +75,7 @@ fn start_flask(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let bundled_backend = bundled_backend_root(&resource_dir)?;
     let backend_root = bundled_backend.join("backend");
     let site_packages = bundled_backend.join("python/site-packages");
-    let python = python_path();
+    let python = python_command(&bundled_backend)?;
     let script = backend_root.join("web_interface.py");
 
     if !backend_root.exists() {
@@ -80,14 +94,15 @@ fn start_flask(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let logs = startup_logs()?;
     let stdout = File::create(&logs.stdout)?;
     let stderr = File::create(&logs.stderr)?;
-    let child = Command::new(&python)
+    let python_path = std::env::join_paths([&site_packages, &backend_root])?;
+    let mut command = Command::new(&python.program);
+    command.args(&python.args);
+    let child = command
         .arg(&script)
         .current_dir(&backend_root)
-        .env(
-            "PYTHONPATH",
-            format!("{}:{}", site_packages.display(), backend_root.display()),
-        )
+        .env("PYTHONPATH", python_path)
         .env("MPLCONFIGDIR", log_dir()?.join("matplotlib"))
+        .env("QUANTAGENT_DESKTOP", "1")
         .env("PYTHONUNBUFFERED", "1")
         .stdin(Stdio::null())
         .stdout(Stdio::from(stdout))
@@ -96,7 +111,7 @@ fn start_flask(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         .map_err(|error| {
             format!(
                 "Failed to start Flask with {} {}: {error}",
-                python,
+                python.display(),
                 script.display()
             )
         })?;
@@ -283,8 +298,92 @@ fn backend_root_display() -> String {
         .unwrap_or_else(|| "Bundled backend was not resolved.".to_string())
 }
 
-fn python_path() -> String {
-    "python3".to_string()
+fn python_command(bundled_backend: &PathBuf) -> Result<PythonCommand, Box<dyn std::error::Error>> {
+    let version_file = bundled_backend.join("python/version.txt");
+    let required_version = fs::read_to_string(&version_file)
+        .map_err(|error| format!("Could not read {}: {error}", version_file.display()))?
+        .trim()
+        .to_string();
+
+    let mut candidates = Vec::new();
+
+    #[cfg(target_os = "windows")]
+    {
+        candidates.push(PythonCommand {
+            program: bundled_backend
+                .join("python-runtime/python.exe")
+                .display()
+                .to_string(),
+            args: vec![],
+        });
+        candidates.push(PythonCommand {
+            program: "py".to_string(),
+            args: vec![format!("-{required_version}")],
+        });
+        candidates.push(PythonCommand {
+            program: "python".to_string(),
+            args: vec![],
+        });
+        candidates.push(PythonCommand {
+            program: "python3".to_string(),
+            args: vec![],
+        });
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        for program in [
+            format!("/Library/Frameworks/Python.framework/Versions/{required_version}/bin/python{required_version}"),
+            format!("/opt/homebrew/bin/python{required_version}"),
+            format!("/usr/local/bin/python{required_version}"),
+            format!("python{required_version}"),
+            "python3".to_string(),
+        ] {
+            candidates.push(PythonCommand {
+                program,
+                args: vec![],
+            });
+        }
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    {
+        for program in [format!("python{required_version}"), "python3".to_string()] {
+            candidates.push(PythonCommand {
+                program,
+                args: vec![],
+            });
+        }
+    }
+
+    for candidate in candidates {
+        if python_matches_version(&candidate, &required_version) {
+            return Ok(candidate);
+        }
+    }
+
+    Err(format!(
+        "Python {required_version} is required by the bundled dependencies but was not found."
+    )
+    .into())
+}
+
+fn python_matches_version(command: &PythonCommand, required_version: &str) -> bool {
+    let output = Command::new(&command.program)
+        .args(&command.args)
+        .arg("--version")
+        .output();
+
+    let Ok(output) = output else {
+        return false;
+    };
+    let version_output = format!(
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    output.status.success() && version_output.starts_with(&format!("Python {required_version}."))
 }
 
 fn bundled_backend_root(resource_dir: &PathBuf) -> Result<PathBuf, Box<dyn std::error::Error>> {

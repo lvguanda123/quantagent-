@@ -61,6 +61,9 @@ jobs:
           cp -R bundled-backend src-tauri/bundled-backend
           ls -la bundled-backend
           ls -la src-tauri/bundled-backend
+          test -f bundled-backend/python-runtime/python.exe
+          bundled-backend/python-runtime/python.exe --version
+          bundled-backend/python-runtime/python.exe -c "import sys; sys.path.insert(0, r'bundled-backend/python/site-packages'); import flask, requests; print('Bundled Python runtime OK')"
 
       - name: Build Tauri Windows app
         working-directory: desktop/tauri
