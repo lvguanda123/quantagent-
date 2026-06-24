@@ -28,7 +28,17 @@ except ImportError as error:
     AKSHARE_AVAILABLE = False
     print(f"Warning: AKShare not available: {error}")
 
-app = Flask(__name__, static_folder="static", static_url_path="/static")
+_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+if _BASE_DIR.startswith("\\\\?\\"):
+    _BASE_DIR = _BASE_DIR[4:]
+
+app = Flask(
+    __name__,
+    root_path=_BASE_DIR,
+    template_folder=os.path.join(_BASE_DIR, "templates"),
+    static_folder=os.path.join(_BASE_DIR, "static"),
+    static_url_path="/static",
+)
 
 
 class WebTradingAnalyzer:
@@ -913,8 +923,8 @@ def get_api_key_status():
 
 
 if __name__ == "__main__":
-    Path("templates").mkdir(exist_ok=True)
-    Path("static").mkdir(exist_ok=True)
+    Path(_BASE_DIR, "templates").mkdir(exist_ok=True)
+    Path(_BASE_DIR, "static").mkdir(exist_ok=True)
     desktop_mode = os.environ.get("QUANTAGENT_DESKTOP") == "1"
     if desktop_mode:
         from waitress import serve

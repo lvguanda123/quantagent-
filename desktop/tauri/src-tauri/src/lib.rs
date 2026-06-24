@@ -387,10 +387,26 @@ fn python_matches_version(command: &PythonCommand, required_version: &str) -> bo
 }
 
 fn bundled_backend_root(resource_dir: &PathBuf) -> Result<PathBuf, Box<dyn std::error::Error>> {
-    let candidates = [
+    let mut candidates = vec![
         resource_dir.join("bundled-backend"),
         resource_dir.join("_up_/bundled-backend"),
+        resource_dir.join("resources/bundled-backend"),
+        resource_dir.join("resources/_up_/bundled-backend"),
     ];
+
+    if let Some(parent) = resource_dir.parent() {
+        candidates.push(parent.join("bundled-backend"));
+        candidates.push(parent.join("_up_/bundled-backend"));
+    }
+
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            candidates.push(exe_dir.join("bundled-backend"));
+            candidates.push(exe_dir.join("_up_/bundled-backend"));
+            candidates.push(exe_dir.join("resources/bundled-backend"));
+            candidates.push(exe_dir.join("resources/_up_/bundled-backend"));
+        }
+    }
 
     candidates
         .into_iter()

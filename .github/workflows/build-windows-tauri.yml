@@ -69,7 +69,7 @@ jobs:
         working-directory: desktop/tauri
         env:
           CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
-        run: npx tauri build --verbose
+        run: npm run build -- --verbose
 
       - name: Show build outputs
         shell: bash

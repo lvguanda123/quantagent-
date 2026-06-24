@@ -24,6 +24,7 @@ if (tauri.status !== 0) {
 
 if (args[0] === "build") {
   fixMacAppBundle();
+  syncWindowsReleaseResources();
 }
 
 function fixMacAppBundle() {
@@ -47,6 +48,33 @@ function syncMacBundledBackend(appPath) {
 
   rmSync(target, { recursive: true, force: true });
   cpSync(source, target, { recursive: true });
+}
+
+function syncWindowsReleaseResources() {
+  if (process.platform !== "win32") {
+    return;
+  }
+
+  const source = resolve("bundled-backend");
+  if (!existsSync(source)) {
+    return;
+  }
+
+  for (const releaseDir of [
+    resolve("src-tauri/target/release"),
+    resolve("src-tauri/target/x86_64-pc-windows-msvc/release"),
+  ]) {
+    if (!existsSync(releaseDir)) {
+      continue;
+    }
+    for (const target of [
+      join(releaseDir, "_up_/bundled-backend"),
+      join(releaseDir, "bundled-backend"),
+    ]) {
+      rmSync(target, { recursive: true, force: true });
+      cpSync(source, target, { recursive: true });
+    }
+  }
 }
 
 function run(command, commandArgs) {
