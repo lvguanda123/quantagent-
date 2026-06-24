@@ -12,7 +12,7 @@ if (args[0] === "dev" || args[0] === "build") {
   run("node", ["scripts/prepare-backend.mjs"]);
 }
 
-runNpx(["tauri", ...args], env);
+runTauri(args, env);
 
 if (args[0] === "build") {
   fixMacAppBundle();
@@ -85,9 +85,8 @@ function run(command, commandArgs) {
   }
 }
 
-function runNpx(commandArgs, commandEnv) {
-  const command = process.platform === "win32" ? "npx.cmd" : "npx";
-  const result = spawnSync(command, commandArgs, {
+function runTauri(commandArgs, commandEnv) {
+  const result = spawnSync(process.execPath, ["node_modules/@tauri-apps/cli/tauri.js", ...commandArgs], {
     env: commandEnv,
     stdio: "inherit",
     shell: false,
