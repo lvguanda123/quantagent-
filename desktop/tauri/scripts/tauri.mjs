@@ -12,15 +12,7 @@ if (args[0] === "dev" || args[0] === "build") {
   run("node", ["scripts/prepare-backend.mjs"]);
 }
 
-const tauri = spawnSync("tauri", args, {
-  env,
-  stdio: "inherit",
-  shell: false,
-});
-
-if (tauri.status !== 0) {
-  process.exit(tauri.status ?? 1);
-}
+runNpx(["tauri", ...args], env);
 
 if (args[0] === "build") {
   fixMacAppBundle();
@@ -82,6 +74,29 @@ function run(command, commandArgs) {
     stdio: "inherit",
     shell: false,
   });
+
+  if (result.error) {
+    console.error(result.error.message);
+    process.exit(1);
+  }
+
+  if (result.status !== 0) {
+    process.exit(result.status ?? 1);
+  }
+}
+
+function runNpx(commandArgs, commandEnv) {
+  const command = process.platform === "win32" ? "npx.cmd" : "npx";
+  const result = spawnSync(command, commandArgs, {
+    env: commandEnv,
+    stdio: "inherit",
+    shell: false,
+  });
+
+  if (result.error) {
+    console.error(result.error.message);
+    process.exit(1);
+  }
 
   if (result.status !== 0) {
     process.exit(result.status ?? 1);
