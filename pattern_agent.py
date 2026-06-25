@@ -69,10 +69,8 @@ def create_pattern_agent(tool_llm, graph_llm, toolkit):
         pattern_image_b64 = state.get("pattern_image")
 
         if (getattr(graph_llm, "metadata", {}) or {}).get("quantagent_provider") == "sohu":
-            compact_data = {
-                key: value[-12:] if isinstance(value, list) else value
-                for key, value in state["kline_data"].items()
-            }
+            compact_data = state["kline_data"]
+            bar_count = len(compact_data.get("Close", []))
             response = graph_llm.invoke(
                 [
                     SystemMessage(
@@ -81,7 +79,8 @@ def create_pattern_agent(tool_llm, graph_llm, toolkit):
                     HumanMessage(
                         content=(
                             f"周期：{time_frame}\n"
-                            f"最近12根OHLC：\n{json.dumps(compact_data, ensure_ascii=False)}\n"
+                            f"本次请分析全部 {bar_count} 根OHLC数据，不要只分析最后12根：\n"
+                            f"{json.dumps(compact_data, ensure_ascii=False)}\n"
                             "请判断是否存在双底、双顶、突破、反转或整理形态；没有明确形态时请直说。"
                         )
                     ),

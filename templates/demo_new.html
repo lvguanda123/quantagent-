@@ -14,21 +14,21 @@
     </script>
     <style>
                  :root {
-             --etrade-purple: #241056;
-             --etrade-purple-light: #5627D8;
-             --etrade-purple-dark: #1A0B3A;
-             --etrade-purple-bg: #F8F5FF;
-            --page-bg: #F8F5FF;
+             --etrade-purple: #17110A;
+             --etrade-purple-light: #C8A044;
+             --etrade-purple-dark: #050505;
+             --etrade-purple-bg: #F8F4EA;
+            --page-bg: #F7F1E7;
             --surface-bg: #ffffff;
-            --surface-muted: #F9FAFB;
-            --toolbar-bg: rgba(255, 255, 255, 0.9);
-            --toolbar-border: rgba(209, 213, 219, 0.72);
-            --text-primary: #1F2937;
-            --text-secondary: #4B5563;
-            --text-muted: #6B7280;
+            --surface-muted: #FBF8F0;
+            --toolbar-bg: rgba(255, 252, 245, 0.92);
+            --toolbar-border: rgba(200, 160, 68, 0.28);
+            --text-primary: #1A1712;
+            --text-secondary: #4B4337;
+            --text-muted: #7B7163;
             --input-bg: #ffffff;
-            --soft-shadow: 0 25px 50px -12px rgba(36, 16, 86, 0.25);
-            --panel-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            --soft-shadow: 0 25px 50px -12px rgba(23, 17, 10, 0.24);
+            --panel-shadow: 0 12px 28px rgba(23, 17, 10, 0.08);
             --white: #ffffff;
             --gray-50: #F9FAFB;
             --gray-100: #F3F4F6;
@@ -43,19 +43,19 @@
         }
 
         :root[data-theme="dark"] {
-            --etrade-purple: #C9B8FF;
-            --etrade-purple-light: #9B7CFF;
-            --etrade-purple-dark: #080B14;
-            --etrade-purple-bg: #0E1118;
-            --page-bg: #0E1118;
-            --surface-bg: #171C26;
-            --surface-muted: #202838;
-            --toolbar-bg: rgba(15, 19, 28, 0.92);
-            --toolbar-border: rgba(124, 139, 166, 0.22);
-            --text-primary: #EEF2F7;
-            --text-secondary: #C7D0DD;
-            --text-muted: #9AA8BA;
-            --input-bg: #111722;
+            --etrade-purple: #F2D178;
+            --etrade-purple-light: #D2A94F;
+            --etrade-purple-dark: #050505;
+            --etrade-purple-bg: #090806;
+            --page-bg: #090806;
+            --surface-bg: #14110C;
+            --surface-muted: #201A11;
+            --toolbar-bg: rgba(10, 8, 6, 0.94);
+            --toolbar-border: rgba(210, 169, 79, 0.3);
+            --text-primary: #F7F0DF;
+            --text-secondary: #D9C9A7;
+            --text-muted: #A89772;
+            --input-bg: #0E0C09;
             --soft-shadow: 0 24px 52px rgba(0, 0, 0, 0.46);
             --panel-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
             --white: #171C26;
@@ -152,7 +152,7 @@
         .md\:mb-0 { margin-bottom: 0; }
         .w-full { width: 100%; }
         .bg-gradient-to-tr { background-image: linear-gradient(to top right, var(--tw-gradient-stops)); }
-        .from-etrade-purple { --tw-gradient-from: var(--etrade-purple); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgba(92, 45, 145, 0)); }
+        .from-etrade-purple { --tw-gradient-from: var(--etrade-purple); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgba(23, 17, 10, 0)); }
         .to-etrade-purple-light { --tw-gradient-to: var(--etrade-purple-light); }
         .shadow-sm { box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); }
         .relative { position: relative; }
@@ -174,7 +174,9 @@
 
         /* Hero Section */
         .hero-section {
-            background: linear-gradient(135deg, var(--etrade-purple) 0%, var(--etrade-purple-light) 100%);
+            background:
+                radial-gradient(circle at 50% 18%, rgba(200, 160, 68, 0.22), transparent 32%),
+                linear-gradient(135deg, #050505 0%, #17110A 58%, #C8A044 160%);
             position: relative;
             overflow: hidden;
         }
@@ -258,13 +260,13 @@
              font-size: 1.1rem;
              color: var(--white);
              transition: all 0.3s ease;
-             box-shadow: 0 4px 15px rgba(86, 39, 216, 0.3);
+             box-shadow: 0 4px 15px rgba(200, 160, 68, 0.28);
              cursor: pointer;
          }
 
          .btn-primary:hover {
              transform: translateY(-2px);
-             box-shadow: 0 8px 25px rgba(86, 39, 216, 0.4);
+             box-shadow: 0 8px 25px rgba(200, 160, 68, 0.35);
              background: var(--etrade-purple);
          }
          
@@ -358,7 +360,7 @@
         }
 
                  .alert-info {
-             background: linear-gradient(135deg, rgba(36, 16, 86, 0.1) 0%, rgba(86, 39, 216, 0.1) 100%);
+             background: linear-gradient(135deg, rgba(23, 17, 10, 0.08) 0%, rgba(200, 160, 68, 0.12) 100%);
              border-left: 4px solid var(--etrade-purple);
              color: var(--gray-700);
          }
@@ -450,7 +452,7 @@
              background: var(--gray-200);
              border-color: var(--etrade-purple-light);
              transform: translateY(-2px);
-             box-shadow: 0 4px 12px rgba(86, 39, 216, 0.15);
+             box-shadow: 0 4px 12px rgba(200, 160, 68, 0.16);
          }
          
          .asset-btn.active {
@@ -458,7 +460,7 @@
              border-color: var(--etrade-purple-light);
              color: var(--white);
              transform: translateY(-2px);
-             box-shadow: 0 8px 20px rgba(86, 39, 216, 0.3);
+             box-shadow: 0 8px 20px rgba(200, 160, 68, 0.25);
          }
          
          .asset-btn i {
@@ -523,7 +525,7 @@
          
          .panel:hover {
              border-color: var(--etrade-purple-light);
-             box-shadow: 0 8px 24px rgba(86, 39, 216, 0.1);
+             box-shadow: 0 8px 24px rgba(23, 17, 10, 0.08);
          }
          
          .panel-title {
@@ -546,7 +548,7 @@
              -webkit-background-clip: text;
              -webkit-text-fill-color: transparent;
              background-clip: text;
-             filter: drop-shadow(0 2px 4px rgba(86, 39, 216, 0.2));
+             filter: drop-shadow(0 2px 4px rgba(200, 160, 68, 0.28));
          }
          
          .action-panel .panel-title {
@@ -576,7 +578,7 @@
              font-weight: 600;
              font-size: 1.1rem;
              transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-             box-shadow: 0 8px 25px rgba(86, 39, 216, 0.3);
+             box-shadow: 0 8px 25px rgba(200, 160, 68, 0.28);
              position: relative;
              overflow: hidden;
          }
@@ -598,13 +600,13 @@
          
          .hero-btn:hover {
              transform: translateY(-3px);
-             box-shadow: 0 12px 35px rgba(86, 39, 216, 0.4);
+             box-shadow: 0 12px 35px rgba(200, 160, 68, 0.32);
              background: linear-gradient(135deg, var(--etrade-purple) 0%, var(--etrade-purple-light) 100%);
          }
          
          .hero-btn:active {
              transform: translateY(-1px);
-             box-shadow: 0 6px 20px rgba(86, 39, 216, 0.3);
+             box-shadow: 0 6px 20px rgba(200, 160, 68, 0.26);
          }
          
          .hero-btn-text {
@@ -806,7 +808,7 @@
          }
          
          .timeframe-btn:hover {
-             background: rgba(86, 39, 216, 0.1);
+             background: rgba(200, 160, 68, 0.12);
              color: var(--etrade-purple);
              transform: translateY(-1px);
          }
@@ -814,7 +816,7 @@
          .timeframe-btn.active {
              background: var(--etrade-purple-light);
              color: var(--white);
-             box-shadow: 0 4px 12px rgba(86, 39, 216, 0.3);
+             box-shadow: 0 4px 12px rgba(200, 160, 68, 0.28);
              transform: translateY(-1px);
          }
          
@@ -856,7 +858,7 @@
          }
 
          .data-source-btn:hover {
-             background: rgba(86, 39, 216, 0.1);
+             background: rgba(200, 160, 68, 0.12);
              color: var(--etrade-purple);
              transform: translateY(-1px);
          }
@@ -864,8 +866,27 @@
          .data-source-btn.active {
              background: var(--etrade-purple-light);
              color: var(--white);
-             box-shadow: 0 4px 12px rgba(86, 39, 216, 0.3);
+             box-shadow: 0 4px 12px rgba(200, 160, 68, 0.28);
              transform: translateY(-1px);
+         }
+
+         .model-advice {
+             display: flex;
+             align-items: flex-start;
+             gap: 0.55rem;
+             margin-top: 0.85rem;
+             padding: 0.85rem 1rem;
+             border-radius: 10px;
+             border: 1px solid rgba(200, 160, 68, 0.28);
+             background: rgba(200, 160, 68, 0.08);
+             color: var(--text-secondary);
+             font-weight: 700;
+             line-height: 1.5;
+         }
+
+         .model-advice i {
+             color: var(--etrade-purple-light);
+             margin-top: 0.15rem;
          }
 
          /* Mobile responsive */
@@ -893,10 +914,10 @@
          
          @keyframes glow {
              from {
-                 box-shadow: 0 0 5px rgba(86, 39, 216, 0.5);
+                 box-shadow: 0 0 5px rgba(200, 160, 68, 0.45);
              }
              to {
-                 box-shadow: 0 0 20px rgba(86, 39, 216, 0.8), 0 0 30px rgba(86, 39, 216, 0.4);
+                 box-shadow: 0 0 20px rgba(200, 160, 68, 0.55), 0 0 30px rgba(200, 160, 68, 0.25);
              }
          }
          
@@ -1037,7 +1058,7 @@
             align-items: center;
             justify-content: center;
             padding: 2rem;
-            background: linear-gradient(135deg, rgba(36, 16, 86, 0.96) 0%, rgba(86, 39, 216, 0.92) 100%);
+            background: linear-gradient(135deg, rgba(5, 5, 5, 0.96) 0%, rgba(23, 17, 10, 0.94) 72%, rgba(200, 160, 68, 0.72) 145%);
         }
 
         .auth-gate.is-visible {
@@ -1168,7 +1189,7 @@
             color: #fff;
             font-weight: 850;
             cursor: pointer;
-            box-shadow: 0 12px 26px rgba(86, 39, 216, 0.28);
+            box-shadow: 0 12px 26px rgba(200, 160, 68, 0.25);
         }
 
         .auth-links {
@@ -1349,7 +1370,9 @@
         }
 
         :root[data-theme="dark"] .hero-section {
-            background: linear-gradient(135deg, #101725 0%, #281B64 58%, #4338CA 100%);
+            background:
+                radial-gradient(circle at 50% 18%, rgba(242, 209, 120, 0.28), transparent 34%),
+                linear-gradient(135deg, #211A0E 0%, #3A2B12 58%, #7A5A1B 135%);
         }
 
         :root[data-theme="dark"] .form-container,
@@ -1731,11 +1754,18 @@
                                             <strong>Qlib:</strong> A股本地数据，无限制
                                         </small>
                                     </div>
-                                
+                            </div>
+
+                            <!-- Panel 2: Date & Time Configuration -->
+                            <div class="panel">
+                                <h4 class="panel-title">
+                                    <i class="fas fa-calendar-alt"></i> 日期与时间
+                                </h4>
+
                                 <!-- Timeframe Selection -->
                                 <div class="form-group">
                                     <label class="form-label">
-                                        <i class="fas fa-chart-line"></i> 时间周期
+                                        <i class="fas fa-chart-line"></i> 时间间隔
                                     </label>
                                     <div class="timeframe-selector">
                                         <button type="button" class="timeframe-btn" data-timeframe="1m" onclick="selectTimeframe(this, '1m')">
@@ -1758,13 +1788,6 @@
                                         </button>
                                     </div>
                                 </div>
-                            </div>
-                            
-                            <!-- Panel 2: Date & Time Configuration -->
-                            <div class="panel">
-                                <h4 class="panel-title">
-                                    <i class="fas fa-calendar-alt"></i> 日期与时间
-                                </h4>
                                 
                                 <!-- Date Range -->
                                 <div class="form-group">
@@ -1835,6 +1858,7 @@
                                         <option value="qwen">通义千问 (Qwen)</option>
                                         <option value="minimax">MiniMax</option>
                                         <option value="sohu">搜狐大模型</option>
+                                        <option value="custom">通用模型（自定义配置）</option>
                                     </select>
                                 </div>
                                 
@@ -1893,12 +1917,37 @@
                                     </div>
                                 </div>
 
+                                <!-- Custom OpenAI-compatible Provider Input -->
+                                <div class="form-group" id="customApiKeyGroup" style="display: none;">
+                                    <label class="form-label">通用模型配置</label>
+                                    <div class="input-group" style="margin-bottom: 0.75rem;">
+                                        <input type="url" class="form-control" id="customBaseUrlInput" placeholder="Base URL，例如：https://api.example.com/v1">
+                                    </div>
+                                    <div class="input-group" style="margin-bottom: 0.75rem;">
+                                        <input type="text" class="form-control" id="customModelInput" placeholder="模型名称，例如：gpt-4o、qwen-vl-max-latest">
+                                    </div>
+                                    <div class="input-group">
+                                        <input type="password" class="form-control" id="customApiKeyInput" placeholder="输入该厂商的 API Key">
+                                        <button class="btn btn-outline-primary" type="button" onclick="updateApiKey('custom', this)">
+                                            <i class="fas fa-save"></i> 更新
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="model-advice" id="customModelAdvice" style="display: none;">
+                                    <i class="fas fa-circle-info"></i>
+                                    部分AI模型的图像分析能力较弱，请谨慎选择
+                                </div>
+
                                 <div class="form-group" style="margin-top: 1rem;">
                                     <label class="form-label">正在使用</label>
                                     <div class="input-group">
                                         <div class="form-control" id="activeApiKeyDisplay" style="display: flex; align-items: center; overflow-wrap: anywhere;">未设置 API Key</div>
                                         <button class="btn btn-outline-primary" id="toggleApiKeyVisibilityBtn" type="button" onclick="toggleActiveApiKeyVisibility(this)" title="显示完整 API Key" disabled>
                                             <i class="fas fa-eye"></i>
+                                        </button>
+                                        <button class="btn btn-outline-primary" id="clearApiKeyBtn" type="button" onclick="clearActiveApiKey(this)" title="不再使用当前 API Key" disabled>
+                                            <i class="fas fa-times"></i>
                                         </button>
                                     </div>
                                 </div>
@@ -2114,7 +2163,7 @@
             select.scrollIntoView({ behavior: 'smooth', block: 'center' });
             setTimeout(() => {
                 select.focus();
-                select.style.boxShadow = '0 0 0 4px rgba(86, 39, 216, 0.25)';
+                select.style.boxShadow = '0 0 0 4px rgba(200, 160, 68, 0.24)';
                 setTimeout(() => {
                     select.style.boxShadow = '';
                 }, 1400);
@@ -2536,7 +2585,8 @@
                         'anthropic': 'Anthropic',
                         'qwen': 'Qwen',
                         'minimax': 'MiniMax',
-                        'sohu': '搜狐大模型'
+                        'sohu': '搜狐大模型',
+                        'custom': '通用模型'
                     };
                     const providerName = providerNames[provider] || provider;
                     
@@ -2544,7 +2594,7 @@
                         console.error('API key status error:', data.error);
                         // Don't show error if it's just that no key is set
                         if (data.has_key === false) {
-                            showApiKeyError(`未找到 ${providerName} API 密钥，请输入您的 ${providerName} API 密钥。`);
+                            showApiKeyError(`未找到 ${providerName} API 密钥，请先输入并更新 ${providerName} API 密钥。`, true);
                         } else {
                             showApiKeyError(`API 密钥检查出错：${data.error}`);
                         }
@@ -2555,7 +2605,7 @@
                     } else {
                         activeApiKeyRevealed = false;
                         updateActiveApiKeyDisplay('未设置 API Key', false);
-                        showApiKeyError(`No ${providerName} API key found. Please enter your ${providerName} API key.`);
+                        showApiKeyError(`未找到 ${providerName} API 密钥，请先输入并更新 ${providerName} API 密钥。`, true);
                     }
                 })
                 .catch(error => {
@@ -2567,7 +2617,9 @@
         function updateActiveApiKeyDisplay(value, hasKey) {
             document.getElementById('activeApiKeyDisplay').textContent = value;
             const button = document.getElementById('toggleApiKeyVisibilityBtn');
+            const clearButton = document.getElementById('clearApiKeyBtn');
             button.disabled = !hasKey;
+            clearButton.disabled = !hasKey;
             button.title = activeApiKeyRevealed ? '隐藏完整 API Key' : '显示完整 API Key';
             button.querySelector('i').className = activeApiKeyRevealed ? 'fas fa-eye-slash' : 'fas fa-eye';
         }
@@ -2588,6 +2640,41 @@
                     updateActiveApiKeyDisplay(data.api_key, true);
                 })
                 .catch(error => showApiKeyError(error.message));
+        }
+
+        function clearActiveApiKey(clearBtn) {
+            const provider = document.getElementById('llmProviderSelect')?.value || 'openai';
+            const originalText = clearBtn.innerHTML;
+            clearBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            clearBtn.disabled = true;
+
+            fetch('/api/clear-api-key', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ provider })
+            })
+            .then(response => response.json().then(data => ({ ok: response.ok, status: response.status, data })))
+            .then(({ ok, status, data }) => {
+                if (!ok || !data.success) {
+                    throw new Error(data.error || `HTTP ${status}`);
+                }
+                activeApiKeyRevealed = false;
+                updateActiveApiKeyDisplay('未设置 API Key', false);
+                const providerNames = {
+                    'openai': 'OpenAI',
+                    'anthropic': 'Anthropic',
+                    'qwen': 'Qwen',
+                    'minimax': 'MiniMax',
+                    'sohu': '搜狐大模型',
+                    'custom': '通用模型'
+                };
+                showApiKeyError(`已不再使用 ${providerNames[provider] || provider} API 密钥。请重新输入并更新后再分析。`, true);
+            })
+            .catch(error => showApiKeyError(error.message))
+            .finally(() => {
+                clearBtn.innerHTML = originalText;
+                clearBtn.disabled = true;
+            });
         }
         
                  // Global variables
@@ -2699,7 +2786,7 @@
              
              // Validate inputs
              if (!asset || !timeframe) {
-                 alert('请选择资产和时间周期。');
+                 alert('请选择资产和时间间隔。');
                  return;
              }
              
@@ -2895,6 +2982,8 @@
              const qwenGroup = document.getElementById('qwenApiKeyGroup');
              const minimaxGroup = document.getElementById('minimaxApiKeyGroup');
              const sohuGroup = document.getElementById('sohuApiKeyGroup');
+             const customGroup = document.getElementById('customApiKeyGroup');
+             const customAdvice = document.getElementById('customModelAdvice');
 
              // Hide all groups first
              openaiGroup.style.display = 'none';
@@ -2902,6 +2991,8 @@
              qwenGroup.style.display = 'none';
              minimaxGroup.style.display = 'none';
              sohuGroup.style.display = 'none';
+             customGroup.style.display = 'none';
+             customAdvice.style.display = 'none';
 
              // Show the selected provider's group
              if (provider === 'openai') {
@@ -2914,6 +3005,9 @@
                  minimaxGroup.style.display = 'block';
              } else if (provider === 'sohu') {
                  sohuGroup.style.display = 'block';
+             } else if (provider === 'custom') {
+                 customGroup.style.display = 'block';
+                 customAdvice.style.display = 'flex';
              }
              
              // Update provider on backend
@@ -2965,6 +3059,8 @@
                  apiKey = document.getElementById('minimaxApiKeyInput').value.trim();
              } else if (actualProvider === 'sohu') {
                  apiKey = document.getElementById('sohuApiKeyInput').value.trim();
+             } else if (actualProvider === 'custom') {
+                 apiKey = document.getElementById('customApiKeyInput').value.trim();
              }
              
              if (!apiKey) {
@@ -2981,15 +3077,21 @@
              updateBtn.disabled = true;
              
              // Make API call to update the key
+             const payload = {
+                 api_key: apiKey,
+                 provider: actualProvider
+             };
+             if (actualProvider === 'custom') {
+                 payload.base_url = document.getElementById('customBaseUrlInput').value.trim();
+                 payload.model = document.getElementById('customModelInput').value.trim();
+             }
+
              fetch('/api/update-api-key', {
                  method: 'POST',
                  headers: {
                      'Content-Type': 'application/json',
                  },
-                 body: JSON.stringify({ 
-                     api_key: apiKey,
-                     provider: actualProvider
-                 })
+                 body: JSON.stringify(payload)
              })
              .then(response => response.json().then(data => ({ ok: response.ok, status: response.status, data })))
              .then(({ ok, status, data }) => {
@@ -3002,7 +3104,8 @@
                          'anthropic': 'Anthropic',
                          'qwen': 'Qwen',
                          'minimax': 'MiniMax',
-                         'sohu': '搜狐大模型'
+                         'sohu': '搜狐大模型',
+                         'custom': '通用模型'
                      };
                      showApiKeySuccess(`${providerNames[actualProvider] || actualProvider} API 密钥更新成功！`);
                      if (actualProvider === 'openai') {
@@ -3015,6 +3118,8 @@
                          document.getElementById('minimaxApiKeyInput').value = '';
                      } else if (actualProvider === 'sohu') {
                          document.getElementById('sohuApiKeyInput').value = '';
+                     } else if (actualProvider === 'custom') {
+                         document.getElementById('customApiKeyInput').value = '';
                      }
                      checkApiKeyStatus();
                  } else {
@@ -3038,6 +3143,7 @@
          function showApiKeySuccess(message) {
              const successDiv = document.getElementById('apiKeySuccess');
              const successText = document.getElementById('apiKeySuccessText');
+             document.getElementById('apiKeyError').style.display = 'none';
              successText.textContent = message;
              successDiv.style.display = 'block';
              
@@ -3046,21 +3152,33 @@
                  successDiv.style.display = 'none';
              }, 5000);
          }
+
+         function showApiKeyStatus(message) {
+             const statusDiv = document.getElementById('apiKeyStatus');
+             const statusText = document.getElementById('apiKeyStatusText');
+             document.getElementById('apiKeyError').style.display = 'none';
+             statusText.textContent = message;
+             statusDiv.style.display = 'block';
+         }
          
-         function showApiKeyError(message) {
+         function showApiKeyError(message, persistent = false) {
              const errorDiv = document.getElementById('apiKeyError');
              const errorText = document.getElementById('apiKeyErrorText');
+             document.getElementById('apiKeyStatus').style.display = 'none';
+             document.getElementById('apiKeySuccess').style.display = 'none';
              errorText.textContent = message;
              errorDiv.style.display = 'block';
              
-             // Hide after 5 seconds
-             setTimeout(() => {
-                 errorDiv.style.display = 'none';
-             }, 5000);
+             if (!persistent) {
+                 setTimeout(() => {
+                     errorDiv.style.display = 'none';
+                 }, 5000);
+             }
          }
          
          function hideApiKeyMessages() {
              document.getElementById('apiKeyError').style.display = 'none';
+             document.getElementById('apiKeyStatus').style.display = 'none';
              document.getElementById('apiKeySuccess').style.display = 'none';
          }
     </script>

@@ -14,21 +14,21 @@
     </script>
     <style>
         :root {
-            --etrade-purple: #241056;
-            --etrade-purple-light: #5627D8;
-            --etrade-purple-dark: #1A0B3A;
-            --etrade-purple-bg: #F8F5FF;
-            --page-bg: #F8F5FF;
+            --etrade-purple: #17110A;
+            --etrade-purple-light: #C8A044;
+            --etrade-purple-dark: #050505;
+            --etrade-purple-bg: #F8F4EA;
+            --page-bg: #F7F1E7;
             --surface-bg: #ffffff;
-            --surface-muted: #F9FAFB;
-            --toolbar-bg: rgba(255, 255, 255, 0.9);
-            --toolbar-border: rgba(209, 213, 219, 0.72);
-            --text-primary: #1F2937;
-            --text-secondary: #4B5563;
-            --text-muted: #6B7280;
+            --surface-muted: #FBF8F0;
+            --toolbar-bg: rgba(255, 252, 245, 0.92);
+            --toolbar-border: rgba(200, 160, 68, 0.28);
+            --text-primary: #1A1712;
+            --text-secondary: #4B4337;
+            --text-muted: #7B7163;
             --input-bg: #ffffff;
-            --soft-shadow: 0 25px 50px -12px rgba(36, 16, 86, 0.25);
-            --panel-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            --soft-shadow: 0 25px 50px -12px rgba(23, 17, 10, 0.24);
+            --panel-shadow: 0 12px 28px rgba(23, 17, 10, 0.08);
             --white: #ffffff;
             --gray-50: #F9FAFB;
             --gray-100: #F3F4F6;
@@ -43,19 +43,19 @@
         }
 
         :root[data-theme="dark"] {
-            --etrade-purple: #C9B8FF;
-            --etrade-purple-light: #9B7CFF;
-            --etrade-purple-dark: #080B14;
-            --etrade-purple-bg: #0E1118;
-            --page-bg: #0E1118;
-            --surface-bg: #171C26;
-            --surface-muted: #202838;
-            --toolbar-bg: rgba(15, 19, 28, 0.92);
-            --toolbar-border: rgba(124, 139, 166, 0.22);
-            --text-primary: #EEF2F7;
-            --text-secondary: #C7D0DD;
-            --text-muted: #9AA8BA;
-            --input-bg: #111722;
+            --etrade-purple: #F2D178;
+            --etrade-purple-light: #D2A94F;
+            --etrade-purple-dark: #050505;
+            --etrade-purple-bg: #090806;
+            --page-bg: #090806;
+            --surface-bg: #14110C;
+            --surface-muted: #201A11;
+            --toolbar-bg: rgba(10, 8, 6, 0.94);
+            --toolbar-border: rgba(210, 169, 79, 0.3);
+            --text-primary: #F7F0DF;
+            --text-secondary: #D9C9A7;
+            --text-muted: #A89772;
+            --input-bg: #0E0C09;
             --soft-shadow: 0 24px 52px rgba(0, 0, 0, 0.46);
             --panel-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
             --white: #171C26;
@@ -84,14 +84,16 @@
         .main-container {
             background: var(--white);
             border-radius: 20px;
-            box-shadow: 0 25px 50px -12px rgba(36, 16, 86, 0.25);
+            box-shadow: var(--soft-shadow);
             margin: 2rem auto;
             max-width: 1200px;
             overflow: hidden;
         }
 
         .header {
-            background: linear-gradient(135deg, var(--etrade-purple) 0%, var(--etrade-purple-light) 100%);
+            background:
+                radial-gradient(circle at 50% 18%, rgba(200, 160, 68, 0.22), transparent 32%),
+                linear-gradient(135deg, #050505 0%, #17110A 58%, #C8A044 160%);
             color: var(--white);
             padding: 3rem 2rem;
             text-align: center;
@@ -170,7 +172,7 @@
          
          .panel:hover {
              border-color: var(--etrade-purple-light);
-             box-shadow: 0 8px 24px rgba(86, 39, 216, 0.1);
+             box-shadow: 0 8px 24px rgba(23, 17, 10, 0.08);
          }
          
                  .panel-title {
@@ -193,7 +195,7 @@
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            filter: drop-shadow(0 2px 4px rgba(86, 39, 216, 0.2));
+            filter: drop-shadow(0 2px 4px rgba(200, 160, 68, 0.28));
         }
 
         /* Large Panel Styling */
@@ -210,7 +212,7 @@
 
         .large-panel:hover {
             border-color: var(--etrade-purple-light);
-            box-shadow: 0 8px 24px rgba(86, 39, 216, 0.1);
+            box-shadow: 0 8px 24px rgba(23, 17, 10, 0.08);
         }
 
         .large-panel-title {
@@ -233,7 +235,7 @@
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            filter: drop-shadow(0 3px 6px rgba(86, 39, 216, 0.3));
+            filter: drop-shadow(0 3px 6px rgba(200, 160, 68, 0.28));
         }
 
         .large-panel-content {
@@ -494,17 +496,31 @@
             padding: 1rem 2rem;
             border-radius: 15px;
             font-weight: 600;
-            display: inline-block;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.7rem;
+            min-width: 12rem;
+            box-shadow: 0 12px 24px rgba(23, 17, 10, 0.14);
         }
 
         .decision-long {
-            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-            color: var(--white);
+            background: linear-gradient(135deg, #D92D20 0%, #F04438 100%);
+            color: #fff;
         }
 
         .decision-short {
-            background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%);
-            color: var(--white);
+            background: linear-gradient(135deg, #059669 0%, #16A34A 100%);
+            color: #fff;
+        }
+
+        .decision-neutral {
+            background: linear-gradient(135deg, #6B7280 0%, #9CA3AF 100%);
+            color: #fff;
+        }
+
+        .decision-badge i {
+            font-size: 1.15em;
         }
 
         .image-container {
@@ -825,7 +841,9 @@
         }
 
         :root[data-theme="dark"] .header {
-            background: linear-gradient(135deg, #101725 0%, #281B64 58%, #4338CA 100%);
+            background:
+                radial-gradient(circle at 50% 18%, rgba(242, 209, 120, 0.28), transparent 34%),
+                linear-gradient(135deg, #211A0E 0%, #3A2B12 58%, #7A5A1B 135%);
         }
 
         :root[data-theme="dark"] .main-container,
@@ -1010,7 +1028,7 @@
                          <div class="col-md-4 d-flex">
                              <div class="stats-card w-100">
                                  <div class="stats-number">{{ results.timeframe if results.timeframe else '1d' }}</div>
-                                 <div class="stats-label">Timeframe</div>
+                                 <div class="stats-label">时间间隔</div>
                              </div>
                          </div>
                          <div class="col-md-4 d-flex">
@@ -1031,13 +1049,13 @@
                          {% set decision = results.final_trade_decision %}
                          {% set direction = results.decision_direction|default('') %}
                          {% if decision and ('LONG' in (decision|upper) or '做多' in direction or '做多' in (decision|upper) or '做多' in decision) %}
-                             <span class="decision-badge decision-long">做多 (LONG)</span>
+                             <span class="decision-badge decision-long"><i class="fas fa-arrow-trend-up"></i> 做多 (LONG)</span>
                          {% elif decision and ('SHORT' in (decision|upper) or '做空' in direction or '做空' in (decision|upper) or '做空' in decision) %}
-                             <span class="decision-badge decision-short">做空 (SHORT)</span>
+                             <span class="decision-badge decision-short"><i class="fas fa-arrow-trend-down"></i> 做空 (SHORT)</span>
                          {% elif decision %}
-                             <span class="decision-badge decision-long">待分析</span>
+                             <span class="decision-badge decision-neutral"><i class="fas fa-arrow-right"></i> 待分析</span>
                          {% else %}
-                             <span class="decision-badge" style="background: linear-gradient(135deg, #6B7280 0%, #9CA3AF 100%); color: white;">暂无决策</span>
+                             <span class="decision-badge decision-neutral"><i class="fas fa-minus"></i> 暂无决策</span>
                          {% endif %}
                      </div>
                      {% if decision %}
@@ -1381,6 +1399,22 @@
             ].join('\n');
         }
 
+        function setDecisionBadge(badge, type) {
+            if (!badge) return;
+            badge.style.background = '';
+            badge.style.color = '';
+            if (type === 'long') {
+                badge.className = 'decision-badge decision-long';
+                badge.innerHTML = '<i class="fas fa-arrow-trend-up"></i> 做多 (LONG)';
+            } else if (type === 'short') {
+                badge.className = 'decision-badge decision-short';
+                badge.innerHTML = '<i class="fas fa-arrow-trend-down"></i> 做空 (SHORT)';
+            } else {
+                badge.className = 'decision-badge decision-neutral';
+                badge.innerHTML = '<i class="fas fa-arrow-right"></i> 暂无明确方向';
+            }
+        }
+
         // Render analysis results from sessionStorage, with localStorage fallback for returning to the last report
         document.addEventListener('DOMContentLoaded', function() {
             const raw = sessionStorage.getItem('analysisResults') || localStorage.getItem('quantagent_last_analysis_results');
@@ -1422,16 +1456,11 @@
                     const upper = r.final_trade_decision.toUpperCase();
                     const dir = (r.decision_direction || '').toUpperCase();
                     if (upper.includes('LONG') || upper.includes('做多') || dir.includes('做多')) {
-                        badge.className = 'decision-badge decision-long';
-                        badge.textContent = '做多 (LONG)';
+                        setDecisionBadge(badge, 'long');
                     } else if (upper.includes('SHORT') || upper.includes('做空') || dir.includes('做空')) {
-                        badge.className = 'decision-badge decision-short';
-                        badge.textContent = '做空 (SHORT)';
+                        setDecisionBadge(badge, 'short');
                     } else {
-                        badge.className = 'decision-badge';
-                        badge.style.background = 'linear-gradient(135deg, #6B7280 0%, #9CA3AF 100%)';
-                        badge.style.color = 'white';
-                        badge.textContent = '暂无明确方向';
+                        setDecisionBadge(badge, 'neutral');
                     }
                 }
             } else if (r.decision_direction) {
@@ -1440,11 +1469,11 @@
                 if (badge) {
                     const dir = r.decision_direction.toUpperCase();
                     if (dir.includes('做多') || dir.includes('LONG')) {
-                        badge.className = 'decision-badge decision-long';
-                        badge.textContent = '做多 (LONG)';
+                        setDecisionBadge(badge, 'long');
                     } else if (dir.includes('做空') || dir.includes('SHORT')) {
-                        badge.className = 'decision-badge decision-short';
-                        badge.textContent = '做空 (SHORT)';
+                        setDecisionBadge(badge, 'short');
+                    } else {
+                        setDecisionBadge(badge, 'neutral');
                     }
                 }
             }

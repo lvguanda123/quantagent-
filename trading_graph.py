@@ -247,10 +247,20 @@ class TradingGraph:
                     "2. Update the config with: config['sohu_api_key'] = 'your-key-here'\n"
                     "3. Use the web interface to update the API key"
                 )
+        elif provider == "custom":
+            api_key = self.config.get("custom_api_key")
+
+            if not api_key:
+                api_key = os.environ.get("CUSTOM_OPENAI_API_KEY")
+
+            if not api_key:
+                raise ValueError(
+                    "Custom AI API key not found. Please provide an API key in settings."
+                )
         else:
             raise ValueError(
                 f"Unsupported provider: {provider}. Must be 'openai', 'anthropic', "
-                "'qwen', 'minimax', or 'sohu'"
+                "'qwen', 'minimax', 'sohu', or 'custom'"
             )
         
         return api_key
@@ -310,10 +320,21 @@ class TradingGraph:
                 temperature=temperature,
                 api_key=api_key,
             )
+        elif provider == "custom":
+            base_url = (self.config.get("custom_base_url") or "").rstrip("/")
+            custom_model = self.config.get("custom_model") or model
+            if not base_url:
+                raise ValueError("请先填写通用 AI 的 Base URL")
+            return ChatOpenAI(
+                model=custom_model,
+                temperature=temperature,
+                api_key=api_key,
+                openai_api_base=base_url,
+            )
         else:
             raise ValueError(
                 f"Unsupported provider: {provider}. Must be 'openai', 'anthropic', "
-                "'qwen', 'minimax', or 'sohu'"
+                "'qwen', 'minimax', 'sohu', or 'custom'"
             )
 
     # def _set_tool_nodes(self) -> Dict[str, ToolNode]:
@@ -368,7 +389,9 @@ class TradingGraph:
         # Recreate the main graph
         self.graph = self.graph_setup.set_graph()
 
-    def update_api_key(self, api_key: str, provider: str = "openai"):
+    def update_api_key(
+        self, api_key: str, provider: str = "openai", base_url: str = "", model: str = ""
+    ):
         """
         Update the API key in the config and refresh LLMs.
         This method is called by the web interface when API key is updated.
@@ -404,10 +427,15 @@ class TradingGraph:
         elif provider == "sohu":
             self.config["sohu_api_key"] = api_key
             os.environ["SOHU_API_KEY"] = api_key
+        elif provider == "custom":
+            self.config["custom_api_key"] = api_key
+            self.config["custom_base_url"] = base_url.rstrip("/")
+            self.config["custom_model"] = model or "gpt-4o"
+            os.environ["CUSTOM_OPENAI_API_KEY"] = api_key
         else:
             raise ValueError(
                 f"Unsupported provider: {provider}. Must be 'openai', 'anthropic', "
-                "'qwen', 'minimax', or 'sohu'"
+                "'qwen', 'minimax', 'sohu', or 'custom'"
             )
         
         # Refresh the LLMs with the new API key

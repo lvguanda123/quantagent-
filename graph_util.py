@@ -18,7 +18,7 @@ matplotlib.use("Agg")
 
 # 保存 record.csv 和 K 线图的基目录
 _RECORD_BASE_DIR = Path("backtest_data")
-_RECORD_BASE_DIR.mkdir(exist_ok=True)
+_RECORD_BASE_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def _make_record_dir(symbol: str, run_ts: str = None) -> Path:
@@ -26,10 +26,11 @@ def _make_record_dir(symbol: str, run_ts: str = None) -> Path:
     from datetime import datetime
     if run_ts is None:
         run_ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    sym_dir = _RECORD_BASE_DIR / symbol
-    sym_dir.mkdir(exist_ok=True)
+    safe_symbol = str(symbol).replace("/", "_").replace("\\", "_").strip() or "default"
+    sym_dir = _RECORD_BASE_DIR / safe_symbol
+    sym_dir.mkdir(parents=True, exist_ok=True)
     run_dir = sym_dir / run_ts
-    run_dir.mkdir(exist_ok=True)
+    run_dir.mkdir(parents=True, exist_ok=True)
     return run_dir
 
 

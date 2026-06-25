@@ -47,9 +47,12 @@ class WebTradingAnalyzer:
         self.config = DEFAULT_CONFIG.copy()
         self.trading_graph = TradingGraph(config=self.config)
 
-    def update_api_key(self, api_key: str, provider: str = "openai"):
+    def update_api_key(
+        self, api_key: str, provider: str = "openai", base_url: str = "", model: str = ""
+    ):
         """Update a provider key using the trading graph's existing storage flow."""
-        self.trading_graph.update_api_key(api_key, provider)
+        self.trading_graph.update_api_key(api_key, provider, base_url, model)
+        self.config = self.trading_graph.config
 
     def validate_sohu_api_key(self, api_key: str):
         """Validate Sohu with a minimal text-only Chat Completions request."""
@@ -453,6 +456,7 @@ class WebTradingAnalyzer:
     ) -> Dict[str, Any]:
         """Run full multi-agent analysis pipeline."""
         try:
+            self.trading_graph.refresh_llms()
             df_slice = df.tail(45)
 
             required = ["Datetime", "Open", "High", "Low", "Close"]
@@ -753,7 +757,12 @@ def asset_info(symbol):
 @app.route("/api/health")
 def health():
     """Health check endpoint."""
-    return jsonify({"status": "ok"})
+    return jsonify({
+        "status": "ok",
+        "desktop": os.environ.get("QUANTAGENT_DESKTOP") == "1",
+        "backend_root": _BASE_DIR,
+        "cwd": os.getcwd(),
+    })
 
 
 @app.route("/api/test-data", methods=["POST"])
@@ -872,6 +881,11 @@ def update_provider():
         provider = data.get("provider", "openai")
         analyzer.config["agent_llm_provider"] = provider
         analyzer.config["graph_llm_provider"] = provider
+        if provider == "custom":
+            if data.get("base_url"):
+                analyzer.config["custom_base_url"] = data.get("base_url", "").strip().rstrip("/")
+            if data.get("model"):
+                analyzer.config["custom_model"] = data.get("model", "").strip()
         return jsonify({"success": True, "provider": provider})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
@@ -884,13 +898,41 @@ def update_api_key():
         data = request.get_json()
         api_key = data.get("api_key", "").strip()
         provider = data.get("provider", "openai")
+        base_url = data.get("base_url", "").strip().rstrip("/")
+        model = data.get("model", "").strip()
 
         if not api_key:
             return jsonify({"success": False, "error": "No API key provided"})
 
+        if provider == "custom" and not base_url:
+            return jsonify({"success": False, "error": "请填写通用 AI 的 Base URL"})
+
         if provider == "sohu":
             analyzer.validate_sohu_api_key(api_key)
-        analyzer.update_api_key(api_key, provider)
+        analyzer.update_api_key(api_key, provider, base_url, model)
+        return jsonify({"success": True, "provider": provider})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
+
+@app.route("/api/clear-api-key", methods=["POST"])
+def clear_api_key():
+    """Clear API key for a provider without falling back to the previous model instance."""
+    try:
+        data = request.get_json()
+        provider = data.get("provider", "openai")
+        key_map = {
+            "openai": ("api_key", "OPENAI_API_KEY"),
+            "anthropic": ("anthropic_api_key", "ANTHROPIC_API_KEY"),
+            "qwen": ("qwen_api_key", "DASHSCOPE_API_KEY"),
+            "minimax": ("minimax_api_key", "MINIMAX_API_KEY"),
+            "sohu": ("sohu_api_key", "SOHU_API_KEY"),
+            "custom": ("custom_api_key", "CUSTOM_OPENAI_API_KEY"),
+        }
+        key_name, env_name = key_map.get(provider, ("api_key", "OPENAI_API_KEY"))
+        analyzer.config[key_name] = ""
+        analyzer.trading_graph.config[key_name] = ""
+        os.environ.pop(env_name, None)
         return jsonify({"success": True, "provider": provider})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
@@ -907,6 +949,7 @@ def get_api_key_status():
             "qwen": "qwen_api_key",
             "minimax": "minimax_api_key",
             "sohu": "sohu_api_key",
+            "custom": "custom_api_key",
         }
         key_name = key_map.get(provider, "api_key")
         api_key = analyzer.config.get(key_name, "")

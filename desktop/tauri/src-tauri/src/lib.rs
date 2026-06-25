@@ -62,12 +62,17 @@ pub fn run() {
 }
 
 fn ensure_flask_ready(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
-    if is_flask_ready() {
+    let resource_dir = app.path().resource_dir()?;
+    let bundled_backend = bundled_backend_root(&resource_dir)?;
+    let expected_backend_root = bundled_backend.join("backend");
+    let _ = BACKEND_ROOT.set(expected_backend_root.clone());
+
+    if is_expected_flask_ready(&expected_backend_root) {
         return Ok(());
     }
 
     start_flask(app)?;
-    wait_for_flask()
+    wait_for_flask(&expected_backend_root)
 }
 
 fn start_flask(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
@@ -87,7 +92,11 @@ fn start_flask(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     }
 
     if !site_packages.exists() {
-        return Err(format!("Bundled Python dependencies not found: {}", site_packages.display()).into());
+        return Err(format!(
+            "Bundled Python dependencies not found: {}",
+            site_packages.display()
+        )
+        .into());
     }
 
     let _ = BACKEND_ROOT.set(backend_root.clone());
@@ -123,11 +132,11 @@ fn start_flask(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn wait_for_flask() -> Result<(), Box<dyn std::error::Error>> {
+fn wait_for_flask(expected_backend_root: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     let started_at = Instant::now();
 
     while started_at.elapsed() < STARTUP_TIMEOUT {
-        if is_flask_ready() {
+        if is_expected_flask_ready(expected_backend_root) {
             return Ok(());
         }
 
@@ -147,41 +156,49 @@ fn wait_for_flask() -> Result<(), Box<dyn std::error::Error>> {
         thread::sleep(Duration::from_millis(400));
     }
 
-    Err(format!(
-        "Timed out waiting for {FLASK_URL}.\n{}",
-        log_summary()
-    )
-    .into())
+    Err(format!("Timed out waiting for {FLASK_URL}.\n{}", log_summary()).into())
 }
 
-fn is_flask_ready() -> bool {
+fn is_expected_flask_ready(expected_backend_root: &PathBuf) -> bool {
+    let Some(body) = request_flask_health() else {
+        return false;
+    };
+    let expected = expected_backend_root.display().to_string();
+    let escaped_expected = expected.replace('\\', "\\\\");
+    body.contains("\"status\":\"ok\"")
+        && body.contains("\"desktop\":true")
+        && (body.contains(&expected) || body.contains(&escaped_expected))
+}
+
+fn request_flask_health() -> Option<String> {
     FLASK_HOST_PORT
         .to_socket_addrs()
         .ok()
         .into_iter()
         .flatten()
-        .any(|addr| {
+        .find_map(|addr| {
             let Ok(mut stream) = TcpStream::connect_timeout(&addr, Duration::from_millis(300)) else {
-                return false;
+                return None;
             };
 
             let _ = stream.set_read_timeout(Some(Duration::from_millis(1200)));
             let _ = stream.set_write_timeout(Some(Duration::from_millis(1200)));
 
             if stream
-                .write_all(b"GET / HTTP/1.1\r\nHost: 127.0.0.1:5000\r\nConnection: close\r\n\r\n")
+                .write_all(b"GET /api/health HTTP/1.1\r\nHost: 127.0.0.1:5000\r\nConnection: close\r\n\r\n")
                 .is_err()
             {
-                return false;
+                return None;
             }
 
-            let mut response = [0; 128];
-            let Ok(count) = stream.read(&mut response) else {
-                return false;
-            };
+            let mut response = String::new();
+            stream.read_to_string(&mut response).ok()?;
 
-            response[..count].starts_with(b"HTTP/1.1 200")
-                || response[..count].starts_with(b"HTTP/1.0 200")
+            if response.starts_with("HTTP/1.1 200") || response.starts_with("HTTP/1.0 200") {
+                Some(response)
+            } else {
+                None
+            }
         })
 }
 
@@ -201,7 +218,8 @@ fn create_main_window(app: &mut tauri::App) -> tauri::Result<()> {
 }
 
 fn create_error_window(app: &mut tauri::App, message: &str) -> tauri::Result<()> {
-    let error_file = write_error_page(message).map_err(|error| tauri::Error::Anyhow(error.into()))?;
+    let error_file =
+        write_error_page(message).map_err(|error| tauri::Error::Anyhow(error.into()))?;
     let error_url = format!("file://{}", error_file.display())
         .parse()
         .expect("valid error file URL");
@@ -219,8 +237,12 @@ fn create_error_window(app: &mut tauri::App, message: &str) -> tauri::Result<()>
 fn write_error_page(message: &str) -> std::io::Result<PathBuf> {
     let path = std::env::temp_dir().join("quantagent-tauri-startup-error.html");
     let logs = STARTUP_LOGS.get();
-    let stdout = logs.map(|logs| logs.stdout.display().to_string()).unwrap_or_default();
-    let stderr = logs.map(|logs| logs.stderr.display().to_string()).unwrap_or_default();
+    let stdout = logs
+        .map(|logs| logs.stdout.display().to_string())
+        .unwrap_or_default();
+    let stderr = logs
+        .map(|logs| logs.stderr.display().to_string())
+        .unwrap_or_default();
     let html = format!(
         r#"<!doctype html>
 <html lang="zh-CN">

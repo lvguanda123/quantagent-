@@ -11,4 +11,7 @@ DEFAULT_CONFIG = {
     "qwen_api_key": "",
     "minimax_api_key": "",
     "sohu_api_key": "",
+    "custom_api_key": "",
+    "custom_base_url": "",
+    "custom_model": "gpt-4o",
 }
