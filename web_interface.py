@@ -41,6 +41,39 @@ app = Flask(
 )
 
 
+def normalize_custom_base_url(base_url: str) -> str:
+    """Normalize common OpenAI-compatible provider URLs to their base URL."""
+    normalized = (base_url or "").strip().rstrip("/")
+    if not normalized:
+        return ""
+    if normalized.endswith("/chat/completions"):
+        normalized = normalized[: -len("/chat/completions")]
+    if normalized == "https://ark.cn-beijing.volces.com/api/coding":
+        normalized = "https://ark.cn-beijing.volces.com/api/v3"
+    return normalized
+
+
+def normalize_custom_base_url_for_mode(base_url: str, mode: str) -> str:
+    """Only normalize OpenAI-compatible URLs; other protocols keep exact base URL."""
+    if mode == "openai":
+        return normalize_custom_base_url(base_url)
+    return (base_url or "").strip().rstrip("/")
+
+
+def format_analysis_error(message: str) -> str:
+    """Turn provider-specific model errors into actionable UI text."""
+    text = str(message)
+    if "InvalidEndpointOrModel.NotFound" in text or "model or endpoint" in text:
+        return (
+            "模型或 Endpoint 不存在，或者当前 Key 没有权限。"
+            "如果使用火山 Ark 的 OpenAI 兼容模式，Base URL 请填 "
+            "https://ark.cn-beijing.volces.com/api/v3，模型名称请填控制台实际开通的 "
+            "endpoint/model id；ark-code-latest 不一定是你的账号可直接调用的模型名。"
+            f" 原始错误：{text}"
+        )
+    return text
+
+
 class WebTradingAnalyzer:
     def __init__(self):
         from default_config import DEFAULT_CONFIG
@@ -48,10 +81,15 @@ class WebTradingAnalyzer:
         self.trading_graph = TradingGraph(config=self.config)
 
     def update_api_key(
-        self, api_key: str, provider: str = "openai", base_url: str = "", model: str = ""
+        self,
+        api_key: str,
+        provider: str = "openai",
+        base_url: str = "",
+        model: str = "",
+        custom_options: dict | None = None,
     ):
         """Update a provider key using the trading graph's existing storage flow."""
-        self.trading_graph.update_api_key(api_key, provider, base_url, model)
+        self.trading_graph.update_api_key(api_key, provider, base_url, model, custom_options)
         self.config = self.trading_graph.config
 
     def validate_sohu_api_key(self, api_key: str):
@@ -703,7 +741,7 @@ def analyze():
 
     except Exception as e:
         print(f"Error: {e}")
-        return jsonify({"error": str(e)})
+        return jsonify({"error": format_analysis_error(str(e))})
 
 
 def run_analysis_job(job_id: str, data: Dict[str, Any]):
@@ -716,7 +754,7 @@ def run_analysis_job(job_id: str, data: Dict[str, Any]):
             analysis_jobs[job_id] = {"status": "completed", "result": result}
     except Exception as error:
         with analysis_jobs_lock:
-            analysis_jobs[job_id] = {"status": "failed", "error": str(error)}
+            analysis_jobs[job_id] = {"status": "failed", "error": format_analysis_error(str(error))}
 
 
 @app.route("/api/analyze/start", methods=["POST"])
@@ -760,6 +798,8 @@ def health():
     return jsonify({
         "status": "ok",
         "desktop": os.environ.get("QUANTAGENT_DESKTOP") == "1",
+        "token": os.environ.get("QUANTAGENT_DESKTOP_TOKEN", ""),
+        "port": int(os.environ.get("QUANTAGENT_FLASK_PORT", "5000")),
         "backend_root": _BASE_DIR,
         "cwd": os.getcwd(),
     })
@@ -882,10 +922,23 @@ def update_provider():
         analyzer.config["agent_llm_provider"] = provider
         analyzer.config["graph_llm_provider"] = provider
         if provider == "custom":
+            if data.get("mode"):
+                analyzer.config["custom_mode"] = data.get("mode", "openai")
             if data.get("base_url"):
-                analyzer.config["custom_base_url"] = data.get("base_url", "").strip().rstrip("/")
+                analyzer.config["custom_base_url"] = normalize_custom_base_url_for_mode(
+                    data.get("base_url", ""),
+                    analyzer.config.get("custom_mode", "openai"),
+                )
+            if data.get("endpoint_url"):
+                analyzer.config["custom_endpoint_url"] = data.get("endpoint_url", "").strip()
             if data.get("model"):
                 analyzer.config["custom_model"] = data.get("model", "").strip()
+            if data.get("headers_template"):
+                analyzer.config["custom_headers_template"] = data.get("headers_template")
+            if data.get("body_template"):
+                analyzer.config["custom_body_template"] = data.get("body_template")
+            if data.get("response_path"):
+                analyzer.config["custom_response_path"] = data.get("response_path")
         return jsonify({"success": True, "provider": provider})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
@@ -898,18 +951,31 @@ def update_api_key():
         data = request.get_json()
         api_key = data.get("api_key", "").strip()
         provider = data.get("provider", "openai")
-        base_url = data.get("base_url", "").strip().rstrip("/")
+        custom_mode = data.get("mode", "openai")
+        base_url = normalize_custom_base_url_for_mode(data.get("base_url", ""), custom_mode)
+        endpoint_url = data.get("endpoint_url", "").strip()
         model = data.get("model", "").strip()
 
         if not api_key:
             return jsonify({"success": False, "error": "No API key provided"})
 
-        if provider == "custom" and not base_url:
+        if provider == "custom" and custom_mode in ("openai", "anthropic") and not base_url:
             return jsonify({"success": False, "error": "请填写通用 AI 的 Base URL"})
+        if provider == "custom" and custom_mode == "http" and not endpoint_url:
+            return jsonify({"success": False, "error": "请填写高级自定义接口的完整请求 URL"})
 
         if provider == "sohu":
             analyzer.validate_sohu_api_key(api_key)
-        analyzer.update_api_key(api_key, provider, base_url, model)
+        custom_options = None
+        if provider == "custom":
+            custom_options = {
+                "mode": custom_mode,
+                "endpoint_url": endpoint_url,
+                "headers_template": data.get("headers_template", ""),
+                "body_template": data.get("body_template", ""),
+                "response_path": data.get("response_path", ""),
+            }
+        analyzer.update_api_key(api_key, provider, base_url, model, custom_options)
         return jsonify({"success": True, "provider": provider})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
@@ -972,6 +1038,7 @@ if __name__ == "__main__":
     if desktop_mode:
         from waitress import serve
 
-        serve(app, host="127.0.0.1", port=5000, threads=8)
+        port = int(os.environ.get("QUANTAGENT_FLASK_PORT", "5000"))
+        serve(app, host="127.0.0.1", port=port, threads=8)
     else:
         app.run(debug=True, use_reloader=True, host="127.0.0.1", port=5000)

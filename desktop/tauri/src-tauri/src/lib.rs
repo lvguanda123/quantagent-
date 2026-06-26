@@ -11,13 +11,15 @@ use std::{
 
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
-const FLASK_URL: &str = "http://127.0.0.1:5000";
-const FLASK_HOST_PORT: &str = "127.0.0.1:5000";
+const FLASK_HOST: &str = "127.0.0.1";
+const DEFAULT_FLASK_PORT: u16 = 5000;
 const STARTUP_TIMEOUT: Duration = Duration::from_secs(90);
+const DESKTOP_BACKEND_TOKEN: &str = "quantagent-desktop-backend-v2";
 
 static FLASK_PROCESS: OnceLock<Mutex<Option<Child>>> = OnceLock::new();
 static STARTUP_LOGS: OnceLock<StartupLogs> = OnceLock::new();
 static BACKEND_ROOT: OnceLock<PathBuf> = OnceLock::new();
+static FLASK_URL: OnceLock<String> = OnceLock::new();
 
 #[derive(Clone)]
 struct StartupLogs {
@@ -67,21 +69,25 @@ fn ensure_flask_ready(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>
     let expected_backend_root = bundled_backend.join("backend");
     let _ = BACKEND_ROOT.set(expected_backend_root.clone());
 
-    if is_expected_flask_ready(&expected_backend_root) {
+    if is_expected_flask_ready(DEFAULT_FLASK_PORT) {
+        set_flask_url(DEFAULT_FLASK_PORT);
         return Ok(());
     }
 
-    start_flask(app)?;
-    wait_for_flask(&expected_backend_root)
+    let port = choose_flask_port()?;
+    set_flask_url(port);
+    start_flask(app, port)?;
+    wait_for_flask(port)
 }
 
-fn start_flask(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+fn start_flask(app: &tauri::App, port: u16) -> Result<(), Box<dyn std::error::Error>> {
     let resource_dir = app.path().resource_dir()?;
     let bundled_backend = bundled_backend_root(&resource_dir)?;
     let backend_root = bundled_backend.join("backend");
     let site_packages = bundled_backend.join("python/site-packages");
     let python = python_command(&bundled_backend)?;
     let script = backend_root.join("web_interface.py");
+    let data_dir = app.path().app_data_dir()?;
 
     if !backend_root.exists() {
         return Err(format!("Bundled backend not found: {}", backend_root.display()).into());
@@ -100,6 +106,7 @@ fn start_flask(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let _ = BACKEND_ROOT.set(backend_root.clone());
+    fs::create_dir_all(&data_dir)?;
     let logs = startup_logs()?;
     let stdout = File::create(&logs.stdout)?;
     let stderr = File::create(&logs.stderr)?;
@@ -112,6 +119,10 @@ fn start_flask(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         .env("PYTHONPATH", python_path)
         .env("MPLCONFIGDIR", log_dir()?.join("matplotlib"))
         .env("QUANTAGENT_DESKTOP", "1")
+        .env("QUANTAGENT_DESKTOP_TOKEN", DESKTOP_BACKEND_TOKEN)
+        .env("QUANTAGENT_DATA_DIR", &data_dir)
+        .env("QUANTAGENT_FLASK_PORT", port.to_string())
+        .env("PYTHONDONTWRITEBYTECODE", "1")
         .env("PYTHONUNBUFFERED", "1")
         .stdin(Stdio::null())
         .stdout(Stdio::from(stdout))
@@ -132,11 +143,12 @@ fn start_flask(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn wait_for_flask(expected_backend_root: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+fn wait_for_flask(port: u16) -> Result<(), Box<dyn std::error::Error>> {
     let started_at = Instant::now();
+    let url = flask_url_for_port(port);
 
     while started_at.elapsed() < STARTUP_TIMEOUT {
-        if is_expected_flask_ready(expected_backend_root) {
+        if is_expected_flask_ready(port) {
             return Ok(());
         }
 
@@ -145,7 +157,7 @@ fn wait_for_flask(expected_backend_root: &PathBuf) -> Result<(), Box<dyn std::er
             if let Some(child) = guard.as_mut() {
                 if let Some(status) = child.try_wait()? {
                     return Err(format!(
-                        "Flask exited before {FLASK_URL} became ready.\nStatus: {status}\n{}",
+                        "Flask exited before {url} became ready.\nStatus: {status}\n{}",
                         log_summary()
                     )
                     .into());
@@ -156,22 +168,57 @@ fn wait_for_flask(expected_backend_root: &PathBuf) -> Result<(), Box<dyn std::er
         thread::sleep(Duration::from_millis(400));
     }
 
-    Err(format!("Timed out waiting for {FLASK_URL}.\n{}", log_summary()).into())
+    Err(format!("Timed out waiting for {url}.\n{}", log_summary()).into())
 }
 
-fn is_expected_flask_ready(expected_backend_root: &PathBuf) -> bool {
-    let Some(body) = request_flask_health() else {
+fn choose_flask_port() -> Result<u16, Box<dyn std::error::Error>> {
+    for port in DEFAULT_FLASK_PORT..=DEFAULT_FLASK_PORT + 20 {
+        if is_expected_flask_ready(port) {
+            return Ok(port);
+        }
+        if !is_port_open(port) {
+            return Ok(port);
+        }
+    }
+
+    Err("No available local port found for QuantAgent between 5000 and 5020.".into())
+}
+
+fn set_flask_url(port: u16) {
+    let _ = FLASK_URL.set(flask_url_for_port(port));
+}
+
+fn current_flask_url() -> String {
+    FLASK_URL
+        .get()
+        .cloned()
+        .unwrap_or_else(|| flask_url_for_port(DEFAULT_FLASK_PORT))
+}
+
+fn flask_url_for_port(port: u16) -> String {
+    format!("http://{FLASK_HOST}:{port}")
+}
+
+fn is_expected_flask_ready(port: u16) -> bool {
+    let Some(body) = request_flask_health(port) else {
         return false;
     };
-    let expected = expected_backend_root.display().to_string();
-    let escaped_expected = expected.replace('\\', "\\\\");
     body.contains("\"status\":\"ok\"")
         && body.contains("\"desktop\":true")
-        && (body.contains(&expected) || body.contains(&escaped_expected))
+        && body.contains(&format!("\"token\":\"{DESKTOP_BACKEND_TOKEN}\""))
 }
 
-fn request_flask_health() -> Option<String> {
-    FLASK_HOST_PORT
+fn is_port_open(port: u16) -> bool {
+    format!("{FLASK_HOST}:{port}")
+        .to_socket_addrs()
+        .ok()
+        .into_iter()
+        .flatten()
+        .any(|addr| TcpStream::connect_timeout(&addr, Duration::from_millis(150)).is_ok())
+}
+
+fn request_flask_health(port: u16) -> Option<String> {
+    format!("{FLASK_HOST}:{port}")
         .to_socket_addrs()
         .ok()
         .into_iter()
@@ -185,7 +232,12 @@ fn request_flask_health() -> Option<String> {
             let _ = stream.set_write_timeout(Some(Duration::from_millis(1200)));
 
             if stream
-                .write_all(b"GET /api/health HTTP/1.1\r\nHost: 127.0.0.1:5000\r\nConnection: close\r\n\r\n")
+                .write_all(
+                    format!(
+                        "GET /api/health HTTP/1.1\r\nHost: {FLASK_HOST}:{port}\r\nConnection: close\r\n\r\n"
+                    )
+                    .as_bytes(),
+                )
                 .is_err()
             {
                 return None;
@@ -203,10 +255,11 @@ fn request_flask_health() -> Option<String> {
 }
 
 fn create_main_window(app: &mut tauri::App) -> tauri::Result<()> {
+    let flask_url = current_flask_url();
     WebviewWindowBuilder::new(
         app,
         "main",
-        WebviewUrl::External(FLASK_URL.parse().expect("valid Flask URL")),
+        WebviewUrl::External(flask_url.parse().expect("valid Flask URL")),
     )
     .title("QuantAgent")
     .inner_size(1280.0, 860.0)
@@ -270,7 +323,7 @@ fn write_error_page(message: &str) -> std::io::Result<PathBuf> {
     </main>
   </body>
 </html>"#,
-        url = FLASK_URL,
+        url = escape_html(&current_flask_url()),
         message = escape_html(message),
         project_root = escape_html(&backend_root_display()),
         stdout = escape_html(&stdout),

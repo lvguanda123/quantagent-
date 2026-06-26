@@ -16,8 +16,9 @@ import color_style as color
 
 matplotlib.use("Agg")
 
-# 保存 record.csv 和 K 线图的基目录
-_RECORD_BASE_DIR = Path("backtest_data")
+# 保存 record.csv 和 K 线图的基目录。
+# 桌面端运行时写入系统应用数据目录，避免修改 .app / 安装目录导致签名失效。
+_RECORD_BASE_DIR = Path(os.environ.get("QUANTAGENT_DATA_DIR", ".")) / "backtest_data"
 _RECORD_BASE_DIR.mkdir(parents=True, exist_ok=True)
 
 

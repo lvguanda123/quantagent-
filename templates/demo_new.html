@@ -1920,17 +1920,32 @@
                                 <!-- Custom OpenAI-compatible Provider Input -->
                                 <div class="form-group" id="customApiKeyGroup" style="display: none;">
                                     <label class="form-label">通用模型配置</label>
-                                    <div class="input-group" style="margin-bottom: 0.75rem;">
-                                        <input type="url" class="form-control" id="customBaseUrlInput" placeholder="Base URL，例如：https://api.example.com/v1">
+                                    <select class="form-control" id="customModeSelect" onchange="handleCustomModeChange()" style="margin-bottom: 0.75rem;">
+                                        <option value="openai" selected>OpenAI 兼容接口</option>
+                                        <option value="anthropic">Anthropic 兼容接口</option>
+                                        <option value="http">高级自定义 HTTP</option>
+                                    </select>
+                                    <div id="customOpenAiConfig">
+                                        <div class="input-group" style="margin-bottom: 0.75rem;">
+                                            <input type="url" class="form-control" id="customBaseUrlInput" placeholder="Base URL，例如：https://api.example.com/v1 或 https://ark.cn-beijing.volces.com/api/v3">
+                                        </div>
                                     </div>
                                     <div class="input-group" style="margin-bottom: 0.75rem;">
-                                        <input type="text" class="form-control" id="customModelInput" placeholder="模型名称，例如：gpt-4o、qwen-vl-max-latest">
-                                    </div>
-                                    <div class="input-group">
                                         <input type="password" class="form-control" id="customApiKeyInput" placeholder="输入该厂商的 API Key">
                                         <button class="btn btn-outline-primary" type="button" onclick="updateApiKey('custom', this)">
                                             <i class="fas fa-save"></i> 更新
                                         </button>
+                                    </div>
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" id="customModelInput" placeholder="模型名称，例如：ark-code-latest">
+                                    </div>
+                                    <div id="customHttpConfig" style="display: none; margin-top: 0.75rem;">
+                                        <div class="input-group" style="margin-bottom: 0.75rem;">
+                                            <input type="url" class="form-control" id="customEndpointUrlInput" placeholder="完整请求 URL，例如：https://ark.cn-beijing.volces.com/api/coding">
+                                        </div>
+                                        <textarea class="form-control" id="customHeadersTemplateInput" rows="3" style="margin-bottom: 0.75rem;" placeholder='Header JSON 模板，例如：{% raw %}{"Authorization":"Bearer {{api_key}}","Content-Type":"application/json"}{% endraw %}'></textarea>
+                                        <textarea class="form-control" id="customBodyTemplateInput" rows="5" style="margin-bottom: 0.75rem;" placeholder='Body JSON 模板，例如：{% raw %}{"model":"{{model}}","messages":{{messages_json}},"temperature":{{temperature}}}{% endraw %}'></textarea>
+                                        <input type="text" class="form-control" id="customResponsePathInput" placeholder="返回内容路径，例如：choices.0.message.content、data.output、result">
                                     </div>
                                 </div>
 
@@ -3008,6 +3023,7 @@
              } else if (provider === 'custom') {
                  customGroup.style.display = 'block';
                  customAdvice.style.display = 'flex';
+                 handleCustomModeChange();
              }
              
              // Update provider on backend
@@ -3020,13 +3036,23 @@
          function updateProvider(provider) {
              // Save provider preference
              localStorage.setItem('quantagent_provider', provider);
+             const payload = { provider: provider };
+             if (provider === 'custom') {
+                 payload.mode = document.getElementById('customModeSelect')?.value || 'openai';
+                 payload.base_url = getCustomBaseUrlForMode(payload.mode);
+                 payload.endpoint_url = document.getElementById('customEndpointUrlInput')?.value.trim() || '';
+                 payload.model = document.getElementById('customModelInput')?.value.trim() || '';
+                 payload.headers_template = document.getElementById('customHeadersTemplateInput')?.value.trim() || '';
+                 payload.body_template = document.getElementById('customBodyTemplateInput')?.value.trim() || '';
+                 payload.response_path = document.getElementById('customResponsePathInput')?.value.trim() || '';
+             }
              
              fetch('/api/update-provider', {
                  method: 'POST',
                  headers: {
                      'Content-Type': 'application/json',
                  },
-                 body: JSON.stringify({ provider: provider })
+                 body: JSON.stringify(payload)
              })
              .then(response => response.json().then(data => ({ ok: response.ok, status: response.status, data })))
              .then(({ ok, status, data }) => {
@@ -3042,6 +3068,53 @@
              .catch(error => {
                  console.error('Error updating provider:', error);
              });
+         }
+
+         function normalizeCustomOpenAiBaseUrl(baseUrl) {
+             const trimmed = (baseUrl || '').trim().replace(/\/+$/, '');
+             if (trimmed === 'https://ark.cn-beijing.volces.com/api/coding') {
+                 return 'https://ark.cn-beijing.volces.com/api/v3';
+             }
+             if (trimmed.endsWith('/chat/completions')) {
+                 return trimmed.slice(0, -'/chat/completions'.length);
+             }
+             return trimmed;
+         }
+
+         function getCustomBaseUrlForMode(mode) {
+             const input = document.getElementById('customBaseUrlInput');
+             const rawValue = (input?.value || '').trim().replace(/\/+$/, '');
+             const normalized = mode === 'openai' ? normalizeCustomOpenAiBaseUrl(rawValue) : rawValue;
+             if (input && normalized && input.value.trim() !== normalized) {
+                 input.value = normalized;
+             }
+             return normalized;
+         }
+
+         function handleCustomModeChange() {
+             const mode = document.getElementById('customModeSelect')?.value || 'openai';
+             const openAiConfig = document.getElementById('customOpenAiConfig');
+             const httpConfig = document.getElementById('customHttpConfig');
+             if (openAiConfig) openAiConfig.style.display = mode === 'http' ? 'none' : 'block';
+             if (httpConfig) httpConfig.style.display = mode === 'http' ? 'block' : 'none';
+             if (mode === 'openai') {
+                 getCustomBaseUrlForMode(mode);
+             }
+
+             const headersInput = document.getElementById('customHeadersTemplateInput');
+             const bodyInput = document.getElementById('customBodyTemplateInput');
+             const responsePathInput = document.getElementById('customResponsePathInput');
+             const templateOpen = '{' + '{';
+             const templateClose = '}' + '}';
+             if (headersInput && !headersInput.value.trim()) {
+                 headersInput.value = `{"Authorization":"Bearer ${templateOpen}api_key${templateClose}","Content-Type":"application/json"}`;
+             }
+             if (bodyInput && !bodyInput.value.trim()) {
+                 bodyInput.value = `{"model":"${templateOpen}model${templateClose}","messages":${templateOpen}messages_json${templateClose},"temperature":${templateOpen}temperature${templateClose}}`;
+             }
+             if (responsePathInput && !responsePathInput.value.trim()) {
+                 responsePathInput.value = 'choices.0.message.content';
+             }
          }
          
          function updateApiKey(provider, updateBtn) {
@@ -3082,8 +3155,14 @@
                  provider: actualProvider
              };
              if (actualProvider === 'custom') {
-                 payload.base_url = document.getElementById('customBaseUrlInput').value.trim();
+                 const customMode = document.getElementById('customModeSelect')?.value || 'openai';
+                 payload.mode = customMode;
+                 payload.base_url = getCustomBaseUrlForMode(customMode);
                  payload.model = document.getElementById('customModelInput').value.trim();
+                 payload.endpoint_url = document.getElementById('customEndpointUrlInput')?.value.trim() || '';
+                 payload.headers_template = document.getElementById('customHeadersTemplateInput')?.value.trim() || '';
+                 payload.body_template = document.getElementById('customBodyTemplateInput')?.value.trim() || '';
+                 payload.response_path = document.getElementById('customResponsePathInput')?.value.trim() || '';
              }
 
              fetch('/api/update-api-key', {
@@ -3107,7 +3186,6 @@
                          'sohu': '搜狐大模型',
                          'custom': '通用模型'
                      };
-                     showApiKeySuccess(`${providerNames[actualProvider] || actualProvider} API 密钥更新成功！`);
                      if (actualProvider === 'openai') {
                          document.getElementById('openaiApiKeyInput').value = '';
                      } else if (actualProvider === 'anthropic') {
@@ -3143,12 +3221,14 @@
          function showApiKeySuccess(message) {
              const successDiv = document.getElementById('apiKeySuccess');
              const successText = document.getElementById('apiKeySuccessText');
+             clearTimeout(window.apiKeySuccessHideTimer);
+             clearTimeout(window.apiKeyStatusHideTimer);
              document.getElementById('apiKeyError').style.display = 'none';
              successText.textContent = message;
              successDiv.style.display = 'block';
              
              // Hide after 5 seconds
-             setTimeout(() => {
+             window.apiKeySuccessHideTimer = setTimeout(() => {
                  successDiv.style.display = 'none';
              }, 5000);
          }
@@ -3156,9 +3236,15 @@
          function showApiKeyStatus(message) {
              const statusDiv = document.getElementById('apiKeyStatus');
              const statusText = document.getElementById('apiKeyStatusText');
+             clearTimeout(window.apiKeyStatusHideTimer);
+             clearTimeout(window.apiKeySuccessHideTimer);
              document.getElementById('apiKeyError').style.display = 'none';
              statusText.textContent = message;
              statusDiv.style.display = 'block';
+
+             window.apiKeyStatusHideTimer = setTimeout(() => {
+                 statusDiv.style.display = 'none';
+             }, 5000);
          }
          
          function showApiKeyError(message, persistent = false) {
@@ -3177,6 +3263,8 @@
          }
          
          function hideApiKeyMessages() {
+             clearTimeout(window.apiKeySuccessHideTimer);
+             clearTimeout(window.apiKeyStatusHideTimer);
              document.getElementById('apiKeyError').style.display = 'none';
              document.getElementById('apiKeyStatus').style.display = 'none';
              document.getElementById('apiKeySuccess').style.display = 'none';

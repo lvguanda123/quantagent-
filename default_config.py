@@ -12,6 +12,11 @@ DEFAULT_CONFIG = {
     "minimax_api_key": "",
     "sohu_api_key": "",
     "custom_api_key": "",
+    "custom_mode": "openai",
     "custom_base_url": "",
+    "custom_endpoint_url": "",
     "custom_model": "gpt-4o",
+    "custom_headers_template": '{"Authorization":"Bearer {{api_key}}","Content-Type":"application/json"}',
+    "custom_body_template": '{"model":"{{model}}","messages":{{messages_json}},"temperature":{{temperature}}}',
+    "custom_response_path": "choices.0.message.content",
 }

@@ -36,7 +36,8 @@ def create_indicator_agent(llm, toolkit):
         ]
         time_frame = state["time_frame"]
 
-        if (getattr(llm, "metadata", {}) or {}).get("quantagent_provider") == "sohu":
+        provider_kind = (getattr(llm, "metadata", {}) or {}).get("quantagent_provider")
+        if provider_kind in ("sohu", "custom_http", "custom_anthropic"):
             tool_results = {}
             for tool_fn in tools:
                 tool_results.update(

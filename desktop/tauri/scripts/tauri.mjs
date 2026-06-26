@@ -26,9 +26,17 @@ function fixMacAppBundle() {
   }
 
   syncMacBundledBackend(appPath);
+  removeLegacyMacLaunchFlag(appPath);
   run("xattr", ["-cr", appPath]);
   run("codesign", ["--force", "--deep", "--sign", "-", appPath]);
   run("codesign", ["--verify", "--deep", "--strict", "--verbose=2", appPath]);
+}
+
+function removeLegacyMacLaunchFlag(appPath) {
+  const plistPath = join(appPath, "Contents/Info.plist");
+  for (const key of ["LSRequiresCarbon", "CSResourcesFileMapped"]) {
+    runOptional("/usr/libexec/PlistBuddy", ["-c", `Delete :${key}`, plistPath]);
+  }
 }
 
 function syncMacBundledBackend(appPath) {
@@ -83,6 +91,13 @@ function run(command, commandArgs) {
   if (result.status !== 0) {
     process.exit(result.status ?? 1);
   }
+}
+
+function runOptional(command, commandArgs) {
+  spawnSync(command, commandArgs, {
+    stdio: "ignore",
+    shell: false,
+  });
 }
 
 function runTauri(commandArgs, commandEnv) {

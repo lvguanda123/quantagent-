@@ -68,7 +68,8 @@ def create_pattern_agent(tool_llm, graph_llm, toolkit):
         # --- Check for precomputed image in state ---
         pattern_image_b64 = state.get("pattern_image")
 
-        if (getattr(graph_llm, "metadata", {}) or {}).get("quantagent_provider") == "sohu":
+        provider_kind = (getattr(graph_llm, "metadata", {}) or {}).get("quantagent_provider")
+        if provider_kind in ("sohu", "custom_http", "custom_anthropic"):
             compact_data = state["kline_data"]
             bar_count = len(compact_data.get("Close", []))
             response = graph_llm.invoke(

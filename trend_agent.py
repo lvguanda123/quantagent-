@@ -58,11 +58,10 @@ def create_trend_agent(tool_llm, graph_llm, toolkit):
 
         messages = []
 
-        if (getattr(graph_llm, "metadata", {}) or {}).get("quantagent_provider") == "sohu":
-            compact_data = {
-                key: value[-12:] if isinstance(value, list) else value
-                for key, value in state["kline_data"].items()
-            }
+        provider_kind = (getattr(graph_llm, "metadata", {}) or {}).get("quantagent_provider")
+        if provider_kind in ("sohu", "custom_http", "custom_anthropic"):
+            compact_data = state["kline_data"]
+            bar_count = len(compact_data.get("Close", []))
             response = graph_llm.invoke(
                 [
                     SystemMessage(
@@ -71,7 +70,8 @@ def create_trend_agent(tool_llm, graph_llm, toolkit):
                     HumanMessage(
                         content=(
                             f"周期：{time_frame}\n"
-                            f"最近12根OHLC：\n{json.dumps(compact_data, ensure_ascii=False)}"
+                            f"本次请分析全部 {bar_count} 根OHLC数据，不要只分析最后12根：\n"
+                            f"{json.dumps(compact_data, ensure_ascii=False)}"
                         )
                     ),
                 ]
