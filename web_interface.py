@@ -939,6 +939,9 @@ def update_provider():
                 analyzer.config["custom_body_template"] = data.get("body_template")
             if data.get("response_path"):
                 analyzer.config["custom_response_path"] = data.get("response_path")
+        elif provider == "trial":
+            analyzer.config["agent_llm_model"] = analyzer.config.get("trial_model", "deepseek-chat")
+            analyzer.config["graph_llm_model"] = analyzer.config.get("trial_model", "deepseek-chat")
         return jsonify({"success": True, "provider": provider})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
@@ -987,12 +990,18 @@ def clear_api_key():
     try:
         data = request.get_json()
         provider = data.get("provider", "openai")
+        if provider == "trial":
+            return jsonify({
+                "success": False,
+                "error": "使用内置模型(Deepseek)使用内置 Key，不能清除。"
+            })
         key_map = {
             "openai": ("api_key", "OPENAI_API_KEY"),
             "anthropic": ("anthropic_api_key", "ANTHROPIC_API_KEY"),
             "qwen": ("qwen_api_key", "DASHSCOPE_API_KEY"),
             "minimax": ("minimax_api_key", "MINIMAX_API_KEY"),
             "sohu": ("sohu_api_key", "SOHU_API_KEY"),
+            "trial": ("trial_api_key", "QUANTAGENT_TRIAL_API_KEY"),
             "custom": ("custom_api_key", "CUSTOM_OPENAI_API_KEY"),
         }
         key_name, env_name = key_map.get(provider, ("api_key", "OPENAI_API_KEY"))
@@ -1015,6 +1024,7 @@ def get_api_key_status():
             "qwen": "qwen_api_key",
             "minimax": "minimax_api_key",
             "sohu": "sohu_api_key",
+            "trial": "trial_api_key",
             "custom": "custom_api_key",
         }
         key_name = key_map.get(provider, "api_key")
@@ -1023,7 +1033,7 @@ def get_api_key_status():
         if api_key and api_key not in ("sk-", ""):
             masked = api_key[:4] + "..." + api_key[-4:] if len(api_key) > 8 else "***"
             response = {"has_key": True, "masked_key": masked}
-            if request.args.get("reveal") == "1":
+            if request.args.get("reveal") == "1" and provider != "trial":
                 response["api_key"] = api_key
             return jsonify(response)
         return jsonify({"has_key": False})

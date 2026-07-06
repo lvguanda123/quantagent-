@@ -1858,6 +1858,7 @@
                                         <option value="qwen">通义千问 (Qwen)</option>
                                         <option value="minimax">MiniMax</option>
                                         <option value="sohu">搜狐大模型</option>
+                                        <option value="trial">使用内置模型(Deepseek)</option>
                                         <option value="custom">通用模型（自定义配置）</option>
                                     </select>
                                 </div>
@@ -2601,6 +2602,7 @@
                         'qwen': 'Qwen',
                         'minimax': 'MiniMax',
                         'sohu': '搜狐大模型',
+                        'trial': '使用内置模型(Deepseek)',
                         'custom': '通用模型'
                     };
                     const providerName = providerNames[provider] || provider;
@@ -2633,18 +2635,25 @@
             document.getElementById('activeApiKeyDisplay').textContent = value;
             const button = document.getElementById('toggleApiKeyVisibilityBtn');
             const clearButton = document.getElementById('clearApiKeyBtn');
-            button.disabled = !hasKey;
-            clearButton.disabled = !hasKey;
-            button.title = activeApiKeyRevealed ? '隐藏完整 API Key' : '显示完整 API Key';
+            const provider = document.getElementById('llmProviderSelect')?.value || 'openai';
+            const isTrialProvider = provider === 'trial';
+            button.disabled = !hasKey || isTrialProvider;
+            button.title = isTrialProvider ? '内置模型 Key 不可查看' : (activeApiKeyRevealed ? '隐藏完整 API Key' : '显示完整 API Key');
+            clearButton.disabled = !hasKey || isTrialProvider;
+            clearButton.title = isTrialProvider ? '试用模型内置 Key 不可清除' : '不再使用当前 API Key';
             button.querySelector('i').className = activeApiKeyRevealed ? 'fas fa-eye-slash' : 'fas fa-eye';
         }
 
         function toggleActiveApiKeyVisibility() {
+            const provider = document.getElementById('llmProviderSelect')?.value || 'openai';
+            if (provider === 'trial') {
+                showApiKeyStatus('使用内置模型(Deepseek)，Key 不可查看。');
+                return;
+            }
             if (activeApiKeyRevealed) {
                 checkApiKeyStatus();
                 return;
             }
-            const provider = document.getElementById('llmProviderSelect')?.value || 'openai';
             fetch(`/api/get-api-key-status?provider=${provider}&reveal=1`)
                 .then(response => response.json())
                 .then(data => {
@@ -2681,6 +2690,7 @@
                     'qwen': 'Qwen',
                     'minimax': 'MiniMax',
                     'sohu': '搜狐大模型',
+                    'trial': '使用内置模型(Deepseek)',
                     'custom': '通用模型'
                 };
                 showApiKeyError(`已不再使用 ${providerNames[provider] || provider} API 密钥。请重新输入并更新后再分析。`, true);
@@ -3020,6 +3030,8 @@
                  minimaxGroup.style.display = 'block';
              } else if (provider === 'sohu') {
                  sohuGroup.style.display = 'block';
+             } else if (provider === 'trial') {
+                 updateActiveApiKeyDisplay('内置试用 Key', true);
              } else if (provider === 'custom') {
                  customGroup.style.display = 'block';
                  customAdvice.style.display = 'flex';
@@ -3184,6 +3196,7 @@
                          'qwen': 'Qwen',
                          'minimax': 'MiniMax',
                          'sohu': '搜狐大模型',
+                         'trial': '使用内置模型(Deepseek)',
                          'custom': '通用模型'
                      };
                      if (actualProvider === 'openai') {

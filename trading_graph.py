@@ -480,6 +480,14 @@ class TradingGraph:
                     "2. Update the config with: config['sohu_api_key'] = 'your-key-here'\n"
                     "3. Use the web interface to update the API key"
                 )
+        elif provider == "trial":
+            api_key = self.config.get("trial_api_key")
+
+            if not api_key:
+                api_key = os.environ.get("QUANTAGENT_TRIAL_API_KEY")
+
+            if not api_key:
+                raise ValueError("试用模型 API Key 未配置，请联系管理员。")
         elif provider == "custom":
             api_key = self.config.get("custom_api_key")
 
@@ -493,7 +501,7 @@ class TradingGraph:
         else:
             raise ValueError(
                 f"Unsupported provider: {provider}. Must be 'openai', 'anthropic', "
-                "'qwen', 'minimax', 'sohu', or 'custom'"
+                "'qwen', 'minimax', 'sohu', 'trial', or 'custom'"
             )
         
         return api_key
@@ -553,6 +561,16 @@ class TradingGraph:
                 temperature=temperature,
                 api_key=api_key,
             )
+        elif provider == "trial":
+            return ChatOpenAI(
+                model=self.config.get("trial_model") or "deepseek-chat",
+                temperature=temperature,
+                api_key=api_key,
+                openai_api_base=normalize_openai_compatible_base_url(
+                    self.config.get("trial_base_url") or "https://api.deepseek.com"
+                ),
+                max_retries=1,
+            )
         elif provider == "custom":
             custom_mode = self.config.get("custom_mode", "openai")
             custom_model = self.config.get("custom_model") or model
@@ -582,7 +600,7 @@ class TradingGraph:
         else:
             raise ValueError(
                 f"Unsupported provider: {provider}. Must be 'openai', 'anthropic', "
-                "'qwen', 'minimax', 'sohu', or 'custom'"
+                "'qwen', 'minimax', 'sohu', 'trial', or 'custom'"
             )
 
     # def _set_tool_nodes(self) -> Dict[str, ToolNode]:
@@ -680,6 +698,9 @@ class TradingGraph:
         elif provider == "sohu":
             self.config["sohu_api_key"] = api_key
             os.environ["SOHU_API_KEY"] = api_key
+        elif provider == "trial":
+            self.config["trial_api_key"] = api_key
+            os.environ["QUANTAGENT_TRIAL_API_KEY"] = api_key
         elif provider == "custom":
             custom_options = custom_options or {}
             self.config["custom_api_key"] = api_key
@@ -700,7 +721,7 @@ class TradingGraph:
         else:
             raise ValueError(
                 f"Unsupported provider: {provider}. Must be 'openai', 'anthropic', "
-                "'qwen', 'minimax', 'sohu', or 'custom'"
+                "'qwen', 'minimax', 'sohu', 'trial', or 'custom'"
             )
         
         # Refresh the LLMs with the new API key
