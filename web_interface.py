@@ -98,7 +98,7 @@ class WebTradingAnalyzer:
             "https://llm-api-test.tv.sohuno.com/v1/chat/completions",
             headers={"Authorization": f"Bearer {api_key}"},
             json={
-                "model": self.config.get("agent_llm_model", "qwen3.6-plus"),
+                "model": "qwen3.6-plus",
                 "messages": [{"role": "user", "content": "Reply with OK."}],
                 "max_tokens": 8,
             },

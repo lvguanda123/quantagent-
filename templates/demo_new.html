@@ -1955,7 +1955,7 @@
                                     部分AI模型的图像分析能力较弱，请谨慎选择
                                 </div>
 
-                                <div class="form-group" style="margin-top: 1rem;">
+                                <div class="form-group" id="activeApiKeyGroup" style="margin-top: 1rem;">
                                     <label class="form-label">正在使用</label>
                                     <div class="input-group">
                                         <div class="form-control" id="activeApiKeyDisplay" style="display: flex; align-items: center; overflow-wrap: anywhere;">未设置 API Key</div>
@@ -2588,6 +2588,16 @@
         
         function checkApiKeyStatus() {
             const provider = document.getElementById('llmProviderSelect')?.value || 'openai';
+            if (provider === 'trial') {
+                hideApiKeyMessages();
+                const activeGroup = document.getElementById('activeApiKeyGroup');
+                if (activeGroup) activeGroup.style.display = 'none';
+                activeApiKeyRevealed = false;
+                updateActiveApiKeyDisplay('未设置 API Key', false);
+                return;
+            }
+            const activeGroup = document.getElementById('activeApiKeyGroup');
+            if (activeGroup) activeGroup.style.display = 'block';
             fetch(`/api/get-api-key-status?provider=${provider}`)
                 .then(response => {
                     if (!response.ok) {
@@ -3009,6 +3019,7 @@
              const sohuGroup = document.getElementById('sohuApiKeyGroup');
              const customGroup = document.getElementById('customApiKeyGroup');
              const customAdvice = document.getElementById('customModelAdvice');
+             const activeGroup = document.getElementById('activeApiKeyGroup');
 
              // Hide all groups first
              openaiGroup.style.display = 'none';
@@ -3018,6 +3029,7 @@
              sohuGroup.style.display = 'none';
              customGroup.style.display = 'none';
              customAdvice.style.display = 'none';
+             if (activeGroup) activeGroup.style.display = provider === 'trial' ? 'none' : 'block';
 
              // Show the selected provider's group
              if (provider === 'openai') {
@@ -3031,7 +3043,9 @@
              } else if (provider === 'sohu') {
                  sohuGroup.style.display = 'block';
              } else if (provider === 'trial') {
-                 updateActiveApiKeyDisplay('内置试用 Key', true);
+                 activeApiKeyRevealed = false;
+                 updateActiveApiKeyDisplay('未设置 API Key', false);
+                 hideApiKeyMessages();
              } else if (provider === 'custom') {
                  customGroup.style.display = 'block';
                  customAdvice.style.display = 'flex';
