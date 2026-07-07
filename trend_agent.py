@@ -21,26 +21,93 @@ def _ensure_dict_args(args):
     return args
 
 
+def _model_name(llm) -> str:
+    return str(
+        getattr(llm, "model_name", "")
+        or getattr(llm, "model", "")
+        or getattr(llm, "model_id", "")
+    ).lower()
+
+
+def _should_use_text_analysis(llm) -> bool:
+    provider_kind = (getattr(llm, "metadata", {}) or {}).get("quantagent_provider")
+    if provider_kind in ("sohu", "custom_http", "custom_anthropic", "trial"):
+        return True
+
+    model = _model_name(llm)
+    vision_markers = ("vision", "vl", "gpt-4o", "gpt-4.1", "claude-3")
+    if any(marker in model for marker in vision_markers):
+        return False
+    return any(marker in model for marker in ("deepseek", "reasoner", "chat", "mini"))
+
+
+def _is_image_unsupported_error(error: Exception) -> bool:
+    text = str(error).lower()
+    return any(
+        marker in text
+        for marker in (
+            "image_url",
+            "vision",
+            "image input",
+            "expected `text`",
+            "unknown variant",
+            "multimodal",
+        )
+    )
+
+
+def _text_trend_analysis(graph_llm, state, time_frame, trend_image_b64):
+    compact_data = state["kline_data"]
+    bar_count = len(compact_data.get("Close", []))
+    response = graph_llm.invoke(
+        [
+            SystemMessage(
+                content="你是K线趋势分析助手。请使用中文判断上涨、下跌或震荡趋势，并说明依据。"
+            ),
+            HumanMessage(
+                content=(
+                    f"周期：{time_frame}\n"
+                    f"本次请分析全部 {bar_count} 根OHLC数据，不要只分析最后12根：\n"
+                    f"{json.dumps(compact_data, ensure_ascii=False)}\n"
+                    "请根据收盘价、高低点、波动区间和近期结构判断支撑、阻力和趋势方向。"
+                )
+            ),
+        ]
+    )
+    return {
+        "messages": [response],
+        "trend_report": response.content,
+        "trend_image": trend_image_b64,
+        "trend_image_filename": "trend_graph.png",
+        "trend_image_description": "Trend chart generated locally",
+    }
+
+
 def invoke_with_retry(call_fn, *args, retries=3, wait_sec=4):
     """
     Retry a function call with exponential backoff for rate limits or errors.
     """
+    last_error = None
     for attempt in range(retries):
         try:
             result = call_fn(*args)
             return result
         except RateLimitError:
+            last_error = None
             print(
                 f"Rate limit hit, retrying in {wait_sec}s (attempt {attempt + 1}/{retries})..."
             )
         except Exception as e:
+            last_error = e
+            if _is_image_unsupported_error(e):
+                raise
             print(
                 f"Other error: {e}, retrying in {wait_sec}s (attempt {attempt + 1}/{retries})..."
             )
         # Only sleep if not the last attempt
         if attempt < retries - 1:
             time.sleep(wait_sec)
-    raise RuntimeError("Max retries exceeded")
+    raise RuntimeError(f"Max retries exceeded: {last_error}") from last_error
 
 
 def create_trend_agent(tool_llm, graph_llm, toolkit):
@@ -58,31 +125,9 @@ def create_trend_agent(tool_llm, graph_llm, toolkit):
 
         messages = []
 
-        provider_kind = (getattr(graph_llm, "metadata", {}) or {}).get("quantagent_provider")
-        if provider_kind in ("sohu", "custom_http", "custom_anthropic"):
-            compact_data = state["kline_data"]
-            bar_count = len(compact_data.get("Close", []))
-            response = graph_llm.invoke(
-                [
-                    SystemMessage(
-                        content="你是K线趋势分析助手。请使用中文判断上涨、下跌或震荡趋势，并说明依据。"
-                    ),
-                    HumanMessage(
-                        content=(
-                            f"周期：{time_frame}\n"
-                            f"本次请分析全部 {bar_count} 根OHLC数据，不要只分析最后12根：\n"
-                            f"{json.dumps(compact_data, ensure_ascii=False)}"
-                        )
-                    ),
-                ]
-            )
-            return {
-                "messages": [response],
-                "trend_report": response.content,
-                "trend_image": trend_image_b64,
-                "trend_image_filename": "trend_graph.png",
-                "trend_image_description": "Trend chart generated locally",
-            }
+        if _should_use_text_analysis(graph_llm):
+            print("Trend Agent: model does not support image input, using OHLC text analysis.")
+            return _text_trend_analysis(graph_llm, state, time_frame, trend_image_b64)
 
         # --- If no precomputed image, fall back to tool generation ---
         if not trend_image_b64:
@@ -177,6 +222,9 @@ def create_trend_agent(tool_llm, graph_llm, toolkit):
                 )
             except Exception as e:
                 error_str = str(e)
+                if _is_image_unsupported_error(e):
+                    print("Trend Agent: image input rejected, falling back to OHLC text analysis.")
+                    return _text_trend_analysis(graph_llm, state, time_frame, trend_image_b64)
                 # Handle Anthropic's "at least one message is required" error
                 # This can happen when SystemMessage extraction leaves empty messages array
                 if "at least one message" in error_str.lower():

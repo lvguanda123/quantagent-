@@ -34,6 +34,79 @@ def invoke_tool_with_retry(tool_fn, tool_args, retries=3, wait_sec=4):
     raise RuntimeError("Tool failed to generate image after multiple retries")
 
 
+def _model_name(llm) -> str:
+    return str(
+        getattr(llm, "model_name", "")
+        or getattr(llm, "model", "")
+        or getattr(llm, "model_id", "")
+    ).lower()
+
+
+def _should_use_text_analysis(llm) -> bool:
+    provider_kind = (getattr(llm, "metadata", {}) or {}).get("quantagent_provider")
+    if provider_kind in ("sohu", "custom_http", "custom_anthropic", "trial"):
+        return True
+
+    model = _model_name(llm)
+    text_only_markers = (
+        "deepseek",
+        "reasoner",
+        "chat",
+        "mini",
+    )
+    vision_markers = (
+        "vision",
+        "vl",
+        "gpt-4o",
+        "gpt-4.1",
+        "claude-3",
+    )
+    if any(marker in model for marker in vision_markers):
+        return False
+    return any(marker in model for marker in text_only_markers)
+
+
+def _is_image_unsupported_error(error: Exception) -> bool:
+    text = str(error).lower()
+    return any(
+        marker in text
+        for marker in (
+            "image_url",
+            "vision",
+            "image input",
+            "expected `text`",
+            "unknown variant",
+            "multimodal",
+        )
+    )
+
+
+def _text_pattern_analysis(graph_llm, state, time_frame, pattern_text):
+    compact_data = state["kline_data"]
+    bar_count = len(compact_data.get("Close", []))
+    response = graph_llm.invoke(
+        [
+            SystemMessage(
+                content="你是K线形态分析助手。请使用中文判断主要形态、方向和风险。"
+            ),
+            HumanMessage(
+                content=(
+                    f"周期：{time_frame}\n"
+                    f"本次请分析全部 {bar_count} 根OHLC数据，不要只分析最后12根：\n"
+                    f"{json.dumps(compact_data, ensure_ascii=False)}\n\n"
+                    f"{pattern_text}\n"
+                    "请基于完整OHLC数据判断是否存在双底、双顶、突破、反转或整理形态；"
+                    "没有明确形态时请直说，并说明支撑、阻力和风险。"
+                )
+            ),
+        ]
+    )
+    return {
+        "messages": [response],
+        "pattern_report": response.content,
+    }
+
+
 def create_pattern_agent(tool_llm, graph_llm, toolkit):
     """
     Create a pattern recognition agent node for candlestick pattern analysis.
@@ -68,46 +141,31 @@ def create_pattern_agent(tool_llm, graph_llm, toolkit):
         # --- Check for precomputed image in state ---
         pattern_image_b64 = state.get("pattern_image")
 
-        provider_kind = (getattr(graph_llm, "metadata", {}) or {}).get("quantagent_provider")
-        if provider_kind in ("sohu", "custom_http", "custom_anthropic"):
-            compact_data = state["kline_data"]
-            bar_count = len(compact_data.get("Close", []))
-            response = graph_llm.invoke(
-                [
-                    SystemMessage(
-                        content="你是K线形态分析助手。请使用中文判断主要形态、方向和风险。"
-                    ),
-                    HumanMessage(
-                        content=(
-                            f"周期：{time_frame}\n"
-                            f"本次请分析全部 {bar_count} 根OHLC数据，不要只分析最后12根：\n"
-                            f"{json.dumps(compact_data, ensure_ascii=False)}\n"
-                            "请判断是否存在双底、双顶、突破、反转或整理形态；没有明确形态时请直说。"
-                        )
-                    ),
-                ]
-            )
-            return {
-                "messages": [response],
-                "pattern_report": response.content,
-            }
+        if _should_use_text_analysis(graph_llm):
+            print("Pattern Agent: model does not support image input, using OHLC text analysis.")
+            return _text_pattern_analysis(graph_llm, state, time_frame, pattern_text)
 
         # --- Retry wrapper for LLM invocation ---
         def invoke_with_retry(call_fn, *args, retries=3, wait_sec=8):
+            last_error = None
             for attempt in range(retries):
                 try:
                     return call_fn(*args)
                 except RateLimitError:
+                    last_error = None
                     print(
                         f"Rate limit hit, retrying in {wait_sec}s (attempt {attempt + 1}/{retries})..."
                     )
                     time.sleep(wait_sec)
                 except Exception as e:
+                    last_error = e
+                    if _is_image_unsupported_error(e):
+                        raise
                     print(
                         f"Other error: {e}, retrying in {wait_sec}s (attempt {attempt + 1}/{retries})..."
                     )
                     time.sleep(wait_sec)
-            raise RuntimeError("Max retries exceeded")
+            raise RuntimeError(f"Max retries exceeded: {last_error}") from last_error
 
         messages = state.get("messages", [])
 
@@ -199,6 +257,9 @@ def create_pattern_agent(tool_llm, graph_llm, toolkit):
                 )
             except Exception as e:
                 error_str = str(e)
+                if _is_image_unsupported_error(e):
+                    print("Pattern Agent: image input rejected, falling back to OHLC text analysis.")
+                    return _text_pattern_analysis(graph_llm, state, time_frame, pattern_text)
                 # Handle Anthropic's "at least one message is required" error
                 # This can happen when SystemMessage extraction leaves empty messages array
                 if "at least one message" in error_str.lower():
