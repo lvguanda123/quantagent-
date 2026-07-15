@@ -833,6 +833,73 @@
              opacity: 0.8;
              animation: glow 2s ease-in-out infinite alternate;
          }
+
+         .timeframe-notice,
+         .history-panel {
+             margin-top: 0.75rem;
+             padding: 0.85rem 1rem;
+             border-radius: 10px;
+             border: 1px solid rgba(200, 160, 68, 0.28);
+             background: rgba(200, 160, 68, 0.08);
+             color: var(--text-secondary);
+             font-size: 0.95rem;
+             line-height: 1.5;
+         }
+
+         .timeframe-notice i,
+         .history-panel i {
+             color: var(--etrade-purple-light);
+             margin-right: 0.35rem;
+         }
+
+         .history-panel {
+             display: none;
+         }
+
+         .history-header {
+             display: flex;
+             align-items: center;
+             justify-content: space-between;
+             gap: 1rem;
+             margin-bottom: 0.7rem;
+             font-weight: 700;
+             color: var(--text-primary);
+         }
+
+         .history-list {
+             display: flex;
+             flex-wrap: wrap;
+             gap: 0.5rem;
+         }
+
+         .history-empty {
+             color: var(--text-muted);
+             font-weight: 600;
+         }
+
+         .history-chip {
+             border: 1px solid rgba(200, 160, 68, 0.32);
+             background: var(--surface-bg);
+             color: var(--text-primary);
+             border-radius: 999px;
+             padding: 0.45rem 0.7rem;
+             cursor: pointer;
+             font-weight: 700;
+             transition: transform 0.2s ease, border-color 0.2s ease;
+         }
+
+         .history-chip:hover {
+             transform: translateY(-1px);
+             border-color: var(--etrade-purple-light);
+         }
+
+         .history-clear {
+             border: none;
+             background: transparent;
+             color: var(--text-muted);
+             cursor: pointer;
+             font-weight: 700;
+         }
          /* Data Source Selector Styles */
          .data-source-selector {
              display: flex;
@@ -1715,6 +1782,14 @@
                                             <i class="fas fa-plus"></i> 自定义
                                         </button>
                                     </div>
+
+                                    <div class="history-panel" id="assetHistoryPanel">
+                                        <div class="history-header">
+                                            <span><i class="fas fa-history"></i> 最近查看</span>
+                                            <button type="button" class="history-clear" onclick="clearAssetHistory()">清空</button>
+                                        </div>
+                                        <div class="history-list" id="assetHistoryList"></div>
+                                    </div>
                                     
                                     <!-- Custom Asset Input -->
                                     <div id="customAssetDiv" class="mt-3" style="display: none;">
@@ -1786,6 +1861,10 @@
                                         <button type="button" class="timeframe-btn active" data-timeframe="1d" onclick="selectTimeframe(this, '1d')">
                                             1d
                                         </button>
+                                    </div>
+                                    <div class="timeframe-notice" id="timeframeNotice" style="display: none;">
+                                        <i class="fas fa-info-circle"></i>
+                                        当时间间隔不是 1d 时，当天的分钟/小时数据可能因为数据源延迟、交易时段或接口限制暂时不可用。
                                     </div>
                                 </div>
                                 
@@ -2169,7 +2248,9 @@
         const STORAGE_KEYS = {
             CUSTOM_ASSETS: 'quantagent_custom_assets',
             SELECTED_ASSET: 'quantagent_selected_asset',
-            SELECTED_TIMEFRAME: 'quantagent_selected_timeframe'
+            SELECTED_TIMEFRAME: 'quantagent_selected_timeframe',
+            SELECTED_DATA_SOURCE: 'quantagent_selected_data_source',
+            ASSET_HISTORY: 'quantagent_asset_history'
         };
 
         function focusModelProvider(event) {
@@ -2287,6 +2368,73 @@
             }
         }
 
+        function getAssetLabel(symbol) {
+            const btn = Array.from(document.querySelectorAll('.asset-btn')).find(item => item.dataset.asset === symbol);
+            if (!btn) return symbol;
+            return btn.textContent.replace(/\s+/g, ' ').trim();
+        }
+
+        function renderAssetHistory() {
+            const panel = document.getElementById('assetHistoryPanel');
+            const listEl = document.getElementById('assetHistoryList');
+            if (!panel || !listEl) return;
+
+            let history = [];
+            try {
+                history = JSON.parse(localStorage.getItem(STORAGE_KEYS.ASSET_HISTORY) || '[]');
+            } catch (e) {
+                history = [];
+            }
+
+            history = Array.isArray(history) ? history.filter(Boolean).slice(0, 8) : [];
+            if (!history.length) {
+                panel.style.display = 'block';
+                listEl.innerHTML = '<span class="history-empty">暂无历史，选择资产后会自动记录。</span>';
+                return;
+            }
+
+            panel.style.display = 'block';
+            listEl.innerHTML = '';
+            history.forEach(symbol => {
+                const chip = document.createElement('button');
+                chip.type = 'button';
+                chip.className = 'history-chip';
+                chip.textContent = getAssetLabel(symbol);
+                chip.dataset.asset = symbol;
+                chip.addEventListener('click', () => selectAssetFromHistory(symbol));
+                listEl.appendChild(chip);
+            });
+        }
+
+        function saveAssetHistory(symbol) {
+            if (!symbol) return;
+            try {
+                const current = JSON.parse(localStorage.getItem(STORAGE_KEYS.ASSET_HISTORY) || '[]');
+                const history = [symbol, ...current.filter(item => item !== symbol)].slice(0, 8);
+                localStorage.setItem(STORAGE_KEYS.ASSET_HISTORY, JSON.stringify(history));
+                renderAssetHistory();
+            } catch (e) {
+                console.warn('Could not persist asset history', e);
+            }
+        }
+
+        function selectAssetFromHistory(symbol) {
+            let btn = Array.from(document.querySelectorAll('.asset-btn')).find(item => item.dataset.asset === symbol);
+            if (!btn) {
+                addCustomAssetButton(symbol, false);
+                btn = Array.from(document.querySelectorAll('.asset-btn')).find(item => item.dataset.asset === symbol);
+            }
+            if (btn) {
+                selectAsset(btn, symbol);
+                btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+
+        function clearAssetHistory() {
+            localStorage.removeItem(STORAGE_KEYS.ASSET_HISTORY);
+            renderAssetHistory();
+        }
+
         // Load custom assets from localStorage and server, render them
         function loadCustomAssets() {
             // Load from localStorage first (fast)
@@ -2398,6 +2546,7 @@
             } catch (e) {
                 console.warn('Could not persist selected asset', e);
             }
+            saveAssetHistory(asset);
 
             // Hide custom asset input if it was showing
             const cav = document.getElementById('customAssetDiv');
@@ -2464,7 +2613,45 @@
             }
 
             console.log('Selected timeframe:', timeframe);
+            updateTimeframeNotice();
         }
+
+        function updateTimeframeNotice() {
+            const notice = document.getElementById('timeframeNotice');
+            if (!notice) return;
+            notice.style.display = selectedTimeframe && selectedTimeframe !== '1d' ? 'block' : 'none';
+        }
+
+        function restoreTimeframeSelection() {
+            try {
+                const buttons = Array.from(document.querySelectorAll('.timeframe-btn'));
+                if (!buttons.length) return;
+
+                const savedTF = localStorage.getItem(STORAGE_KEYS.SELECTED_TIMEFRAME);
+                let targetBtn = savedTF ? buttons.find(btn => btn.dataset.timeframe === savedTF) : null;
+
+                if (!targetBtn) {
+                    const activeButtons = buttons.filter(btn => btn.classList.contains('active'));
+                    targetBtn = activeButtons.find(btn => btn.dataset.timeframe !== '1d')
+                        || activeButtons[0]
+                        || buttons.find(btn => btn.dataset.timeframe === '1d')
+                        || buttons[0];
+                }
+
+                if (targetBtn?.dataset?.timeframe) {
+                    selectTimeframe(targetBtn, targetBtn.dataset.timeframe);
+                } else {
+                    updateTimeframeNotice();
+                }
+            } catch (e) {
+                console.warn('Could not restore timeframe selection', e);
+            }
+        }
+
+        window.addEventListener('pageshow', function() {
+            restoreTimeframeSelection();
+            setTimeout(restoreTimeframeSelection, 80);
+        });
 
         // On page load, restore selected asset/timeframe and custom assets
         document.addEventListener('DOMContentLoaded', function() {
@@ -2489,20 +2676,9 @@
             
             // Load custom assets and server-synced assets
             loadCustomAssets();
+            renderAssetHistory();
 
-            // Restore selected timeframe (if saved)
-            try {
-                const savedTF = localStorage.getItem(STORAGE_KEYS.SELECTED_TIMEFRAME);
-                if (savedTF) {
-                    const tfBtn = Array.from(document.querySelectorAll('.timeframe-btn')).find(b => b.dataset.timeframe === savedTF);
-                    if (tfBtn) {
-                        tfBtn.classList.add('active');
-                        selectedTimeframe = savedTF;
-                    }
-                }
-            } catch (e) {
-                console.warn('Could not restore timeframe from localStorage', e);
-            }
+            restoreTimeframeSelection();
 
             // Restore selected data source (if saved)
             try {
@@ -2732,6 +2908,7 @@
              } catch (e) {
                  console.warn('Could not persist selected asset', e);
              }
+             saveAssetHistory(asset);
 
              // Hide custom asset input if it was showing
              const cav = document.getElementById('customAssetDiv');
@@ -2914,6 +3091,7 @@
                     const serializedResults = JSON.stringify(data.full_results);
                     sessionStorage.setItem('analysisResults', serializedResults);
                     localStorage.setItem(ANALYSIS_CACHE_KEY, serializedResults);
+                    saveAssetHistory(data.full_results.asset_name || selectedAsset);
                     updateReturnReportButton();
                 }
                 stopAnalysisLoading(true);

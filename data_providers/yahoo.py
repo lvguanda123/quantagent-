@@ -34,6 +34,14 @@ YAHOO_SYMBOLS: dict[str, str] = {
     "DXY": "DX-Y.NYB",
     "AAPL": "AAPL",
     "TSLA": "TSLA",
+    "000001": "000001.SZ",
+    "300750": "300750.SZ",
+    "600519": "600519.SS",
+    "601318": "601318.SS",
+    "SH000001": "000001.SS",
+    "SZ399001": "399001.SZ",
+    "SZ399006": "399006.SZ",
+    "SH000300": "000300.SS",
 }
 
 # Interval mapping: internal -> yfinance

@@ -20,6 +20,17 @@ from flask import Flask, jsonify, render_template, request, send_from_directory
 import static_util
 from trading_graph import TradingGraph
 
+try:
+    from data_providers import DataProviderError, FetchRequest, QlibProvider, YahooFinanceProvider
+    DATA_PROVIDERS_AVAILABLE = True
+except ImportError as error:
+    DATA_PROVIDERS_AVAILABLE = False
+    DataProviderError = Exception
+    FetchRequest = None
+    QlibProvider = None
+    YahooFinanceProvider = None
+    print(f"Warning: data providers not available: {error}")
+
 # AKShare
 try:
     import akshare as ak
@@ -79,6 +90,20 @@ class WebTradingAnalyzer:
         from default_config import DEFAULT_CONFIG
         self.config = DEFAULT_CONFIG.copy()
         self.trading_graph = TradingGraph(config=self.config)
+
+    def normalize_akshare_timeframe(self, timeframe: str) -> str:
+        """Map UI interval names to AKShare interval names."""
+        return {
+            "1h": "60m",
+            "60": "60m",
+            "60min": "60m",
+        }.get(timeframe, timeframe)
+
+    def is_cn_market_symbol(self, symbol: str) -> bool:
+        """Return whether a symbol is likely supported by AKShare A-share routes."""
+        clean_upper = (symbol or "").strip().upper()
+        clean = clean_upper.replace("SZ", "").replace("SH", "")
+        return clean_upper.startswith(("SH", "SZ")) or (clean.isdigit() and len(clean) == 6)
 
     def update_api_key(
         self,
@@ -458,15 +483,50 @@ class WebTradingAnalyzer:
 
         return "stock"
 
-    def fetch_data(
+    def fetch_provider_data(
+        self, data_source: str, symbol: str, timeframe: str, start_date: str, end_date: str,
+        start_time: str = "00:00", end_time: str = "23:59"
+    ) -> pd.DataFrame:
+        """Fetch data through the pluggable provider layer."""
+        if not DATA_PROVIDERS_AVAILABLE or FetchRequest is None:
+            raise RuntimeError("数据源模块不可用")
+
+        provider_name = "yahoo" if data_source in ("live", "yahoo", "yfinance") else data_source
+        if provider_name not in ("yahoo", "qlib"):
+            raise ValueError(f"不支持的数据源：{data_source}")
+
+        try:
+            start_dt = datetime.strptime(f"{start_date} {start_time}", "%Y-%m-%d %H:%M")
+            end_dt = datetime.strptime(f"{end_date} {end_time}", "%Y-%m-%d %H:%M")
+        except ValueError as error:
+            raise ValueError("日期或时间格式不正确") from error
+
+        if provider_name == "yahoo":
+            provider = YahooFinanceProvider()
+        else:
+            provider = QlibProvider()
+        req = FetchRequest(
+            symbol=symbol,
+            interval=timeframe,
+            start_date=start_dt,
+            end_date=end_dt,
+        )
+
+        # Use provider fetching/normalization but keep QuantAgent's existing tolerance
+        # for short windows such as 15 trading days.
+        raw = provider._raw_fetch(req)
+        return provider._normalize(raw)
+
+    def fetch_akshare_routed_data(
         self, symbol: str, timeframe: str, start_date: str, end_date: str,
         start_time: str = "00:00", end_time: str = "23:59"
     ) -> pd.DataFrame:
-        """Route to correct data fetcher based on symbol and timeframe."""
+        """Route AKShare data fetching based on symbol and timeframe."""
+        akshare_timeframe = self.normalize_akshare_timeframe(timeframe)
         asset_type = self.detect_asset_type(symbol)
 
         # Minute-level data (A-share stocks, ETFs, and indices)
-        if timeframe in ["1m", "5m", "15m", "30m", "60m"]:
+        if akshare_timeframe in ["1m", "5m", "15m", "30m", "60m"]:
             try:
                 start_dt = datetime.strptime(f"{start_date} {start_time}", "%Y-%m-%d %H:%M")
                 end_dt = datetime.strptime(f"{end_date} {end_time}", "%Y-%m-%d %H:%M")
@@ -474,11 +534,11 @@ class WebTradingAnalyzer:
                 return pd.DataFrame()
 
             if asset_type == "stock":
-                return self.fetch_akshare_stock_min_data(symbol, timeframe, start_dt, end_dt)
+                return self.fetch_akshare_stock_min_data(symbol, akshare_timeframe, start_dt, end_dt)
             elif asset_type == "etf":
-                return self.fetch_akshare_etf_min_data(symbol, timeframe, start_dt, end_dt)
+                return self.fetch_akshare_etf_min_data(symbol, akshare_timeframe, start_dt, end_dt)
             elif asset_type == "a_index":
-                return self.fetch_akshare_index_min_data(symbol, timeframe, start_dt, end_dt)
+                return self.fetch_akshare_index_min_data(symbol, akshare_timeframe, start_dt, end_dt)
 
         # Daily-level data
         if asset_type == "a_index":
@@ -487,6 +547,60 @@ class WebTradingAnalyzer:
             return self.fetch_akshare_fund_data(symbol, start_date, end_date)
         else:
             return self.fetch_akshare_stock_data(symbol, start_date, end_date)
+
+    def fetch_data(
+        self, symbol: str, timeframe: str, start_date: str, end_date: str,
+        start_time: str = "00:00", end_time: str = "23:59", data_source: str = "akshare"
+    ) -> pd.DataFrame:
+        """Route to the chosen data source, with CN/Yahoo fallback for unstable networks."""
+        normalized_source = (data_source or "akshare").strip().lower()
+        errors = []
+
+        if normalized_source in ("live", "yahoo", "yfinance"):
+            try:
+                df = self.fetch_provider_data(
+                    normalized_source, symbol, timeframe, start_date, end_date, start_time, end_time
+                )
+                if df is not None and not df.empty:
+                    return df
+                errors.append("Yahoo Finance 返回空数据")
+            except Exception as error:
+                errors.append(f"Yahoo Finance 失败：{error}")
+
+            if self.is_cn_market_symbol(symbol):
+                df = self.fetch_akshare_routed_data(symbol, timeframe, start_date, end_date, start_time, end_time)
+                if df is not None and not df.empty:
+                    print("Yahoo Finance failed; fell back to AKShare successfully.")
+                    return df
+                errors.append("AKShare 兜底也没有返回数据")
+
+            raise RuntimeError("；".join(errors))
+
+        if normalized_source == "qlib":
+            return self.fetch_provider_data(
+                normalized_source, symbol, timeframe, start_date, end_date, start_time, end_time
+            )
+
+        df = self.fetch_akshare_routed_data(symbol, timeframe, start_date, end_date, start_time, end_time)
+        if df is not None and not df.empty:
+            return df
+
+        if self.is_cn_market_symbol(symbol):
+            errors.append("AKShare 返回空数据，可能是当前网络无法访问新浪/东方财富")
+            try:
+                fallback = self.fetch_provider_data(
+                    "yahoo", symbol, timeframe, start_date, end_date, start_time, end_time
+                )
+                if fallback is not None and not fallback.empty:
+                    print("AKShare failed; fell back to Yahoo Finance successfully.")
+                    return fallback
+                errors.append("Yahoo Finance 兜底也没有返回数据")
+            except Exception as error:
+                errors.append(f"Yahoo Finance 兜底失败：{error}")
+
+        if errors:
+            raise RuntimeError("；".join(errors))
+        return pd.DataFrame()
 
     def run_analysis(
         self, df: pd.DataFrame, asset_name: str, timeframe: str = "1d",
@@ -647,22 +761,35 @@ def analyze():
         end_date = data.get("end_date")
         start_time = data.get("start_time", "00:00")
         end_time = data.get("end_time", "23:59")
+        data_source = data.get("data_source", "akshare")
 
         if not all([asset, start_date, end_date]):
             return jsonify({"error": "Missing: asset, start_date, end_date"})
 
-        # Fetch data
-        print(f"Fetching data: {asset} {timeframe} {start_date} to {end_date}")
-        df = analyzer.fetch_data(asset, timeframe, start_date, end_date, start_time, end_time)
+        print(f"Fetching data: {asset} {timeframe} {start_date} to {end_date} via {data_source}")
+        try:
+            df = analyzer.fetch_data(asset, timeframe, start_date, end_date, start_time, end_time, data_source)
+        except Exception as data_error:
+            return jsonify({
+                "error": f"行情数据获取失败：{format_analysis_error(str(data_error))}",
+                "stage": "data_fetch",
+            })
 
         if df.empty:
-            return jsonify({"error": f"No data for {asset}"})
+            return jsonify({"error": f"行情数据获取失败：{asset} 没有返回可用数据", "stage": "data_fetch"})
 
         print(f"Got {len(df)} rows, running analysis...")
         results = analyzer.run_analysis(df, f"{asset}", timeframe, start_date, end_date)
 
         if not results.get("success"):
-            return jsonify({"error": results.get("error", "Analysis failed")})
+            return jsonify({
+                "error": (
+                    f"行情数据已获取 {len(df)} 条，但 AI 分析失败："
+                    f"{format_analysis_error(results.get('error', 'Analysis failed'))}"
+                ),
+                "stage": "ai_analysis",
+                "data_rows": len(df),
+            })
 
         final_state = results.get("final_state", {})
 
@@ -710,6 +837,7 @@ def analyze():
             "success": True,
             "redirect": "/output",
             "asset_name": results["asset_name"],
+            "timeframe": timeframe,
             "data_length": results["data_length"],
             "indicator_report": indicator_report,
             "pattern_report": final_state.get("pattern_report", ""),
@@ -816,12 +944,13 @@ def test_data():
         end_date = data.get("end_date")
         start_time = data.get("start_time", "00:00")
         end_time = data.get("end_time", "23:59")
+        data_source = data.get("data_source", "akshare")
 
         if not all([asset, start_date, end_date]):
             return jsonify({"error": "Missing: asset, start_date, end_date"})
 
-        print(f"Fetching data: {asset} {timeframe} {start_date} to {end_date}")
-        df = analyzer.fetch_data(asset, timeframe, start_date, end_date, start_time, end_time)
+        print(f"Fetching data: {asset} {timeframe} {start_date} to {end_date} via {data_source}")
+        df = analyzer.fetch_data(asset, timeframe, start_date, end_date, start_time, end_time, data_source)
 
         if df.empty:
             return jsonify({"error": f"No data for {asset}"})
