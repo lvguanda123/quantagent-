@@ -7,7 +7,9 @@ import json
 import os
 import re
 import requests
+import threading
 import urllib.parse
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict
@@ -18,15 +20,69 @@ from flask import Flask, jsonify, render_template, request, send_from_directory
 import static_util
 from trading_graph import TradingGraph
 
+try:
+    from data_providers import DataProviderError, FetchRequest, QlibProvider, YahooFinanceProvider
+    DATA_PROVIDERS_AVAILABLE = True
+except ImportError as error:
+    DATA_PROVIDERS_AVAILABLE = False
+    DataProviderError = Exception
+    FetchRequest = None
+    QlibProvider = None
+    YahooFinanceProvider = None
+    print(f"Warning: data providers not available: {error}")
+
 # AKShare
 try:
     import akshare as ak
     AKSHARE_AVAILABLE = True
-except ImportError:
+except ImportError as error:
     AKSHARE_AVAILABLE = False
-    print("Warning: AKShare not available")
+    print(f"Warning: AKShare not available: {error}")
 
-app = Flask(__name__, static_folder="static", static_url_path="/static")
+_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+if _BASE_DIR.startswith("\\\\?\\"):
+    _BASE_DIR = _BASE_DIR[4:]
+
+app = Flask(
+    __name__,
+    root_path=_BASE_DIR,
+    template_folder=os.path.join(_BASE_DIR, "templates"),
+    static_folder=os.path.join(_BASE_DIR, "static"),
+    static_url_path="/static",
+)
+
+
+def normalize_custom_base_url(base_url: str) -> str:
+    """Normalize common OpenAI-compatible provider URLs to their base URL."""
+    normalized = (base_url or "").strip().rstrip("/")
+    if not normalized:
+        return ""
+    if normalized.endswith("/chat/completions"):
+        normalized = normalized[: -len("/chat/completions")]
+    if normalized == "https://ark.cn-beijing.volces.com/api/coding":
+        normalized = "https://ark.cn-beijing.volces.com/api/v3"
+    return normalized
+
+
+def normalize_custom_base_url_for_mode(base_url: str, mode: str) -> str:
+    """Only normalize OpenAI-compatible URLs; other protocols keep exact base URL."""
+    if mode == "openai":
+        return normalize_custom_base_url(base_url)
+    return (base_url or "").strip().rstrip("/")
+
+
+def format_analysis_error(message: str) -> str:
+    """Turn provider-specific model errors into actionable UI text."""
+    text = str(message)
+    if "InvalidEndpointOrModel.NotFound" in text or "model or endpoint" in text:
+        return (
+            "模型或 Endpoint 不存在，或者当前 Key 没有权限。"
+            "如果使用火山 Ark 的 OpenAI 兼容模式，Base URL 请填 "
+            "https://ark.cn-beijing.volces.com/api/v3，模型名称请填控制台实际开通的 "
+            "endpoint/model id；ark-code-latest 不一定是你的账号可直接调用的模型名。"
+            f" 原始错误：{text}"
+        )
+    return text
 
 
 class WebTradingAnalyzer:
@@ -34,6 +90,54 @@ class WebTradingAnalyzer:
         from default_config import DEFAULT_CONFIG
         self.config = DEFAULT_CONFIG.copy()
         self.trading_graph = TradingGraph(config=self.config)
+
+    def normalize_akshare_timeframe(self, timeframe: str) -> str:
+        """Map UI interval names to AKShare interval names."""
+        return {
+            "1h": "60m",
+            "60": "60m",
+            "60min": "60m",
+        }.get(timeframe, timeframe)
+
+    def is_cn_market_symbol(self, symbol: str) -> bool:
+        """Return whether a symbol is likely supported by AKShare A-share routes."""
+        clean_upper = (symbol or "").strip().upper()
+        clean = clean_upper.replace("SZ", "").replace("SH", "")
+        return clean_upper.startswith(("SH", "SZ")) or (clean.isdigit() and len(clean) == 6)
+
+    def update_api_key(
+        self,
+        api_key: str,
+        provider: str = "openai",
+        base_url: str = "",
+        model: str = "",
+        custom_options: dict | None = None,
+    ):
+        """Update a provider key using the trading graph's existing storage flow."""
+        self.trading_graph.update_api_key(api_key, provider, base_url, model, custom_options)
+        self.config = self.trading_graph.config
+
+    def validate_sohu_api_key(self, api_key: str):
+        """Validate Sohu with a minimal text-only Chat Completions request."""
+        response = requests.post(
+            "https://llm-api-test.tv.sohuno.com/v1/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}"},
+            json={
+                "model": "qwen3.6-plus",
+                "messages": [{"role": "user", "content": "Reply with OK."}],
+                "max_tokens": 8,
+            },
+            timeout=20,
+        )
+        if response.ok:
+            return
+
+        try:
+            error_data = response.json()
+            message = error_data.get("message") or error_data.get("error")
+        except ValueError:
+            message = response.text
+        raise ValueError(f"搜狐接口验证失败（HTTP {response.status_code}）：{message or '未知错误'}")
 
     def fetch_akshare_stock_data(
         self, symbol: str, start_date: str, end_date: str
@@ -379,15 +483,50 @@ class WebTradingAnalyzer:
 
         return "stock"
 
-    def fetch_data(
+    def fetch_provider_data(
+        self, data_source: str, symbol: str, timeframe: str, start_date: str, end_date: str,
+        start_time: str = "00:00", end_time: str = "23:59"
+    ) -> pd.DataFrame:
+        """Fetch data through the pluggable provider layer."""
+        if not DATA_PROVIDERS_AVAILABLE or FetchRequest is None:
+            raise RuntimeError("数据源模块不可用")
+
+        provider_name = "yahoo" if data_source in ("live", "yahoo", "yfinance") else data_source
+        if provider_name not in ("yahoo", "qlib"):
+            raise ValueError(f"不支持的数据源：{data_source}")
+
+        try:
+            start_dt = datetime.strptime(f"{start_date} {start_time}", "%Y-%m-%d %H:%M")
+            end_dt = datetime.strptime(f"{end_date} {end_time}", "%Y-%m-%d %H:%M")
+        except ValueError as error:
+            raise ValueError("日期或时间格式不正确") from error
+
+        if provider_name == "yahoo":
+            provider = YahooFinanceProvider()
+        else:
+            provider = QlibProvider()
+        req = FetchRequest(
+            symbol=symbol,
+            interval=timeframe,
+            start_date=start_dt,
+            end_date=end_dt,
+        )
+
+        # Use provider fetching/normalization but keep QuantAgent's existing tolerance
+        # for short windows such as 15 trading days.
+        raw = provider._raw_fetch(req)
+        return provider._normalize(raw)
+
+    def fetch_akshare_routed_data(
         self, symbol: str, timeframe: str, start_date: str, end_date: str,
         start_time: str = "00:00", end_time: str = "23:59"
     ) -> pd.DataFrame:
-        """Route to correct data fetcher based on symbol and timeframe."""
+        """Route AKShare data fetching based on symbol and timeframe."""
+        akshare_timeframe = self.normalize_akshare_timeframe(timeframe)
         asset_type = self.detect_asset_type(symbol)
 
         # Minute-level data (A-share stocks, ETFs, and indices)
-        if timeframe in ["1m", "5m", "15m", "30m", "60m"]:
+        if akshare_timeframe in ["1m", "5m", "15m", "30m", "60m"]:
             try:
                 start_dt = datetime.strptime(f"{start_date} {start_time}", "%Y-%m-%d %H:%M")
                 end_dt = datetime.strptime(f"{end_date} {end_time}", "%Y-%m-%d %H:%M")
@@ -395,11 +534,11 @@ class WebTradingAnalyzer:
                 return pd.DataFrame()
 
             if asset_type == "stock":
-                return self.fetch_akshare_stock_min_data(symbol, timeframe, start_dt, end_dt)
+                return self.fetch_akshare_stock_min_data(symbol, akshare_timeframe, start_dt, end_dt)
             elif asset_type == "etf":
-                return self.fetch_akshare_etf_min_data(symbol, timeframe, start_dt, end_dt)
+                return self.fetch_akshare_etf_min_data(symbol, akshare_timeframe, start_dt, end_dt)
             elif asset_type == "a_index":
-                return self.fetch_akshare_index_min_data(symbol, timeframe, start_dt, end_dt)
+                return self.fetch_akshare_index_min_data(symbol, akshare_timeframe, start_dt, end_dt)
 
         # Daily-level data
         if asset_type == "a_index":
@@ -409,12 +548,67 @@ class WebTradingAnalyzer:
         else:
             return self.fetch_akshare_stock_data(symbol, start_date, end_date)
 
+    def fetch_data(
+        self, symbol: str, timeframe: str, start_date: str, end_date: str,
+        start_time: str = "00:00", end_time: str = "23:59", data_source: str = "akshare"
+    ) -> pd.DataFrame:
+        """Route to the chosen data source, with CN/Yahoo fallback for unstable networks."""
+        normalized_source = (data_source or "akshare").strip().lower()
+        errors = []
+
+        if normalized_source in ("live", "yahoo", "yfinance"):
+            try:
+                df = self.fetch_provider_data(
+                    normalized_source, symbol, timeframe, start_date, end_date, start_time, end_time
+                )
+                if df is not None and not df.empty:
+                    return df
+                errors.append("Yahoo Finance 返回空数据")
+            except Exception as error:
+                errors.append(f"Yahoo Finance 失败：{error}")
+
+            if self.is_cn_market_symbol(symbol):
+                df = self.fetch_akshare_routed_data(symbol, timeframe, start_date, end_date, start_time, end_time)
+                if df is not None and not df.empty:
+                    print("Yahoo Finance failed; fell back to AKShare successfully.")
+                    return df
+                errors.append("AKShare 兜底也没有返回数据")
+
+            raise RuntimeError("；".join(errors))
+
+        if normalized_source == "qlib":
+            return self.fetch_provider_data(
+                normalized_source, symbol, timeframe, start_date, end_date, start_time, end_time
+            )
+
+        df = self.fetch_akshare_routed_data(symbol, timeframe, start_date, end_date, start_time, end_time)
+        if df is not None and not df.empty:
+            return df
+
+        if self.is_cn_market_symbol(symbol):
+            errors.append("AKShare 返回空数据，可能是当前网络无法访问新浪/东方财富")
+            try:
+                fallback = self.fetch_provider_data(
+                    "yahoo", symbol, timeframe, start_date, end_date, start_time, end_time
+                )
+                if fallback is not None and not fallback.empty:
+                    print("AKShare failed; fell back to Yahoo Finance successfully.")
+                    return fallback
+                errors.append("Yahoo Finance 兜底也没有返回数据")
+            except Exception as error:
+                errors.append(f"Yahoo Finance 兜底失败：{error}")
+
+        if errors:
+            raise RuntimeError("；".join(errors))
+        return pd.DataFrame()
+
     def run_analysis(
         self, df: pd.DataFrame, asset_name: str, timeframe: str = "1d",
         start_date: str = "", end_date: str = ""
     ) -> Dict[str, Any]:
         """Run full multi-agent analysis pipeline."""
         try:
+            self.trading_graph.refresh_llms()
             df_slice = df.tail(45)
 
             required = ["Datetime", "Open", "High", "Low", "Close"]
@@ -468,6 +662,88 @@ class WebTradingAnalyzer:
 
 
 analyzer = WebTradingAnalyzer()
+analysis_jobs = {}
+analysis_jobs_lock = threading.Lock()
+
+
+def _has_report_text(value: Any) -> bool:
+    if not isinstance(value, str):
+        return False
+    text = value.strip()
+    if not text:
+        return False
+    placeholders = {
+        "indicator analysis completed.",
+        "trend analysis completed.",
+        "waiting for analysis",
+    }
+    return text.lower() not in placeholders
+
+
+def _latest_number(values: Any):
+    if isinstance(values, list) and values:
+        try:
+            return float(values[-1])
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
+def build_indicator_fallback_report(final_state: Dict[str, Any]) -> str:
+    rsi = _latest_number(final_state.get("rsi"))
+    macd = _latest_number(final_state.get("macd"))
+    macd_signal = _latest_number(final_state.get("macd_signal"))
+    stoch_k = _latest_number(final_state.get("stoch_k"))
+    willr = _latest_number(final_state.get("willr"))
+
+    lines = ["### 技术指标分析", ""]
+    if rsi is not None:
+        if rsi >= 70:
+            lines.append(f"- RSI 当前约为 {rsi:.2f}，处于偏热区域，短线需留意回落风险。")
+        elif rsi <= 30:
+            lines.append(f"- RSI 当前约为 {rsi:.2f}，处于偏冷区域，可能存在技术修复需求。")
+        else:
+            lines.append(f"- RSI 当前约为 {rsi:.2f}，整体处于中性区间。")
+    if macd is not None and macd_signal is not None:
+        relation = "强于" if macd >= macd_signal else "弱于"
+        lines.append(f"- MACD 当前为 {macd:.4f}，{relation}信号线 {macd_signal:.4f}。")
+    if stoch_k is not None:
+        lines.append(f"- 随机指标 %K 当前约为 {stoch_k:.2f}，可结合价格位置观察短线动能。")
+    if willr is not None:
+        lines.append(f"- 威廉指标 %R 当前约为 {willr:.2f}，用于辅助判断超买超卖状态。")
+    if len(lines) == 2:
+        lines.append("- 本次分析未获得完整技术指标文字报告，请参考下方指标数值表。")
+    lines.extend(["", "以上为本地兜底生成的技术指标摘要。"])
+    return "\n".join(lines)
+
+
+def build_trend_fallback_report(final_state: Dict[str, Any]) -> str:
+    kline_data = final_state.get("kline_data", {}) or {}
+    close_values = kline_data.get("Close") or kline_data.get("close") or []
+    trend = "震荡"
+    change_text = ""
+    try:
+        closes = [float(v) for v in close_values if v is not None]
+        if len(closes) >= 2:
+            change = (closes[-1] - closes[0]) / closes[0] * 100 if closes[0] else 0
+            if change > 1:
+                trend = "偏强上行"
+            elif change < -1:
+                trend = "偏弱下行"
+            change_text = f"，区间涨跌幅约 {change:.2f}%"
+    except (TypeError, ValueError):
+        closes = []
+
+    lines = [
+        "### 趋势分析",
+        "",
+        f"- 根据当前 K 线序列，价格整体表现为{trend}{change_text}。",
+        "- 趋势图中的支撑/阻力线可作为观察价格突破或回踩的参考。",
+        "- 若价格持续站上阻力区域，短线动能可能增强；若跌破支撑区域，需要留意回撤风险。",
+        "",
+        "以上为本地兜底生成的趋势摘要。",
+    ]
+    return "\n".join(lines)
 
 
 @app.route("/")
@@ -485,22 +761,35 @@ def analyze():
         end_date = data.get("end_date")
         start_time = data.get("start_time", "00:00")
         end_time = data.get("end_time", "23:59")
+        data_source = data.get("data_source", "akshare")
 
         if not all([asset, start_date, end_date]):
             return jsonify({"error": "Missing: asset, start_date, end_date"})
 
-        # Fetch data
-        print(f"Fetching data: {asset} {timeframe} {start_date} to {end_date}")
-        df = analyzer.fetch_data(asset, timeframe, start_date, end_date, start_time, end_time)
+        print(f"Fetching data: {asset} {timeframe} {start_date} to {end_date} via {data_source}")
+        try:
+            df = analyzer.fetch_data(asset, timeframe, start_date, end_date, start_time, end_time, data_source)
+        except Exception as data_error:
+            return jsonify({
+                "error": f"行情数据获取失败：{format_analysis_error(str(data_error))}",
+                "stage": "data_fetch",
+            })
 
         if df.empty:
-            return jsonify({"error": f"No data for {asset}"})
+            return jsonify({"error": f"行情数据获取失败：{asset} 没有返回可用数据", "stage": "data_fetch"})
 
         print(f"Got {len(df)} rows, running analysis...")
         results = analyzer.run_analysis(df, f"{asset}", timeframe, start_date, end_date)
 
         if not results.get("success"):
-            return jsonify({"error": results.get("error", "Analysis failed")})
+            return jsonify({
+                "error": (
+                    f"行情数据已获取 {len(df)} 条，但 AI 分析失败："
+                    f"{format_analysis_error(results.get('error', 'Analysis failed'))}"
+                ),
+                "stage": "ai_analysis",
+                "data_rows": len(df),
+            })
 
         final_state = results.get("final_state", {})
 
@@ -537,14 +826,22 @@ def analyze():
             stop_loss = parsed.get("止损价格", parsed.get("stop_loss"))
             take_profit = parsed.get("止盈价格", parsed.get("take_profit"))
 
+        indicator_report = final_state.get("indicator_report", "")
+        trend_report = final_state.get("trend_report", "")
+        if not _has_report_text(indicator_report):
+            indicator_report = build_indicator_fallback_report(final_state)
+        if not _has_report_text(trend_report):
+            trend_report = build_trend_fallback_report(final_state)
+
         full_response = {
             "success": True,
             "redirect": "/output",
             "asset_name": results["asset_name"],
+            "timeframe": timeframe,
             "data_length": results["data_length"],
-            "indicator_report": final_state.get("indicator_report", ""),
+            "indicator_report": indicator_report,
             "pattern_report": final_state.get("pattern_report", ""),
-            "trend_report": final_state.get("trend_report", ""),
+            "trend_report": trend_report,
             "final_trade_decision": cleaned_decision,
             "decision_direction": decision_direction,
             "entry_price": entry_price or final_state.get("entry_price"),
@@ -572,7 +869,48 @@ def analyze():
 
     except Exception as e:
         print(f"Error: {e}")
-        return jsonify({"error": str(e)})
+        return jsonify({"error": format_analysis_error(str(e))})
+
+
+def run_analysis_job(job_id: str, data: Dict[str, Any]):
+    """Run the existing synchronous analysis in a background thread."""
+    try:
+        with app.test_request_context("/api/analyze", method="POST", json=data):
+            response = analyze()
+            result = response.get_json()
+        with analysis_jobs_lock:
+            analysis_jobs[job_id] = {"status": "completed", "result": result}
+    except Exception as error:
+        with analysis_jobs_lock:
+            analysis_jobs[job_id] = {"status": "failed", "error": format_analysis_error(str(error))}
+
+
+@app.route("/api/analyze/start", methods=["POST"])
+def start_analysis():
+    """Start a long-running analysis without holding the WebView connection."""
+    data = request.get_json() or {}
+    if not all([data.get("asset"), data.get("start_date"), data.get("end_date")]):
+        return jsonify({"error": "Missing: asset, start_date, end_date"}), 400
+
+    job_id = uuid.uuid4().hex
+    with analysis_jobs_lock:
+        analysis_jobs[job_id] = {"status": "running"}
+
+    threading.Thread(
+        target=run_analysis_job,
+        args=(job_id, data),
+        daemon=True,
+    ).start()
+    return jsonify({"job_id": job_id}), 202
+
+
+@app.route("/api/analyze/status/<job_id>")
+def analysis_status(job_id: str):
+    with analysis_jobs_lock:
+        job = analysis_jobs.get(job_id)
+    if job is None:
+        return jsonify({"error": "Analysis job not found"}), 404
+    return jsonify(job)
 
 
 @app.route("/api/asset-info/<symbol>")
@@ -585,7 +923,14 @@ def asset_info(symbol):
 @app.route("/api/health")
 def health():
     """Health check endpoint."""
-    return jsonify({"status": "ok"})
+    return jsonify({
+        "status": "ok",
+        "desktop": os.environ.get("QUANTAGENT_DESKTOP") == "1",
+        "token": os.environ.get("QUANTAGENT_DESKTOP_TOKEN", ""),
+        "port": int(os.environ.get("QUANTAGENT_FLASK_PORT", "5000")),
+        "backend_root": _BASE_DIR,
+        "cwd": os.getcwd(),
+    })
 
 
 @app.route("/api/test-data", methods=["POST"])
@@ -599,12 +944,13 @@ def test_data():
         end_date = data.get("end_date")
         start_time = data.get("start_time", "00:00")
         end_time = data.get("end_time", "23:59")
+        data_source = data.get("data_source", "akshare")
 
         if not all([asset, start_date, end_date]):
             return jsonify({"error": "Missing: asset, start_date, end_date"})
 
-        print(f"Fetching data: {asset} {timeframe} {start_date} to {end_date}")
-        df = analyzer.fetch_data(asset, timeframe, start_date, end_date, start_time, end_time)
+        print(f"Fetching data: {asset} {timeframe} {start_date} to {end_date} via {data_source}")
+        df = analyzer.fetch_data(asset, timeframe, start_date, end_date, start_time, end_time, data_source)
 
         if df.empty:
             return jsonify({"error": f"No data for {asset}"})
@@ -704,6 +1050,27 @@ def update_provider():
         provider = data.get("provider", "openai")
         analyzer.config["agent_llm_provider"] = provider
         analyzer.config["graph_llm_provider"] = provider
+        if provider == "custom":
+            if data.get("mode"):
+                analyzer.config["custom_mode"] = data.get("mode", "openai")
+            if data.get("base_url"):
+                analyzer.config["custom_base_url"] = normalize_custom_base_url_for_mode(
+                    data.get("base_url", ""),
+                    analyzer.config.get("custom_mode", "openai"),
+                )
+            if data.get("endpoint_url"):
+                analyzer.config["custom_endpoint_url"] = data.get("endpoint_url", "").strip()
+            if data.get("model"):
+                analyzer.config["custom_model"] = data.get("model", "").strip()
+            if data.get("headers_template"):
+                analyzer.config["custom_headers_template"] = data.get("headers_template")
+            if data.get("body_template"):
+                analyzer.config["custom_body_template"] = data.get("body_template")
+            if data.get("response_path"):
+                analyzer.config["custom_response_path"] = data.get("response_path")
+        elif provider == "trial":
+            analyzer.config["agent_llm_model"] = analyzer.config.get("trial_model", "deepseek-chat")
+            analyzer.config["graph_llm_model"] = analyzer.config.get("trial_model", "deepseek-chat")
         return jsonify({"success": True, "provider": provider})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
@@ -716,11 +1083,60 @@ def update_api_key():
         data = request.get_json()
         api_key = data.get("api_key", "").strip()
         provider = data.get("provider", "openai")
+        custom_mode = data.get("mode", "openai")
+        base_url = normalize_custom_base_url_for_mode(data.get("base_url", ""), custom_mode)
+        endpoint_url = data.get("endpoint_url", "").strip()
+        model = data.get("model", "").strip()
 
         if not api_key:
             return jsonify({"success": False, "error": "No API key provided"})
 
-        analyzer.update_api_key(api_key, provider)
+        if provider == "custom" and custom_mode in ("openai", "anthropic") and not base_url:
+            return jsonify({"success": False, "error": "请填写通用 AI 的 Base URL"})
+        if provider == "custom" and custom_mode == "http" and not endpoint_url:
+            return jsonify({"success": False, "error": "请填写高级自定义接口的完整请求 URL"})
+
+        if provider == "sohu":
+            analyzer.validate_sohu_api_key(api_key)
+        custom_options = None
+        if provider == "custom":
+            custom_options = {
+                "mode": custom_mode,
+                "endpoint_url": endpoint_url,
+                "headers_template": data.get("headers_template", ""),
+                "body_template": data.get("body_template", ""),
+                "response_path": data.get("response_path", ""),
+            }
+        analyzer.update_api_key(api_key, provider, base_url, model, custom_options)
+        return jsonify({"success": True, "provider": provider})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
+
+@app.route("/api/clear-api-key", methods=["POST"])
+def clear_api_key():
+    """Clear API key for a provider without falling back to the previous model instance."""
+    try:
+        data = request.get_json()
+        provider = data.get("provider", "openai")
+        if provider == "trial":
+            return jsonify({
+                "success": False,
+                "error": "使用内置模型(Deepseek)使用内置 Key，不能清除。"
+            })
+        key_map = {
+            "openai": ("api_key", "OPENAI_API_KEY"),
+            "anthropic": ("anthropic_api_key", "ANTHROPIC_API_KEY"),
+            "qwen": ("qwen_api_key", "DASHSCOPE_API_KEY"),
+            "minimax": ("minimax_api_key", "MINIMAX_API_KEY"),
+            "sohu": ("sohu_api_key", "SOHU_API_KEY"),
+            "trial": ("trial_api_key", "QUANTAGENT_TRIAL_API_KEY"),
+            "custom": ("custom_api_key", "CUSTOM_OPENAI_API_KEY"),
+        }
+        key_name, env_name = key_map.get(provider, ("api_key", "OPENAI_API_KEY"))
+        analyzer.config[key_name] = ""
+        analyzer.trading_graph.config[key_name] = ""
+        os.environ.pop(env_name, None)
         return jsonify({"success": True, "provider": provider})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
@@ -736,19 +1152,32 @@ def get_api_key_status():
             "anthropic": "anthropic_api_key",
             "qwen": "qwen_api_key",
             "minimax": "minimax_api_key",
+            "sohu": "sohu_api_key",
+            "trial": "trial_api_key",
+            "custom": "custom_api_key",
         }
         key_name = key_map.get(provider, "api_key")
         api_key = analyzer.config.get(key_name, "")
 
         if api_key and api_key not in ("sk-", ""):
             masked = api_key[:4] + "..." + api_key[-4:] if len(api_key) > 8 else "***"
-            return jsonify({"has_key": True, "masked_key": masked})
+            response = {"has_key": True, "masked_key": masked}
+            if request.args.get("reveal") == "1" and provider != "trial":
+                response["api_key"] = api_key
+            return jsonify(response)
         return jsonify({"has_key": False})
     except Exception as e:
         return jsonify({"error": str(e), "has_key": False})
 
 
 if __name__ == "__main__":
-    Path("templates").mkdir(exist_ok=True)
-    Path("static").mkdir(exist_ok=True)
-    app.run(debug=True, host="127.0.0.1", port=5000)
+    Path(_BASE_DIR, "templates").mkdir(exist_ok=True)
+    Path(_BASE_DIR, "static").mkdir(exist_ok=True)
+    desktop_mode = os.environ.get("QUANTAGENT_DESKTOP") == "1"
+    if desktop_mode:
+        from waitress import serve
+
+        port = int(os.environ.get("QUANTAGENT_FLASK_PORT", "5000"))
+        serve(app, host="127.0.0.1", port=port, threads=8)
+    else:
+        app.run(debug=True, use_reloader=True, host="127.0.0.1", port=5000)

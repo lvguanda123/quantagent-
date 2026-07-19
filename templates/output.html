@@ -6,12 +6,29 @@
     <title>QuantAgent - Analysis Results</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        (function () {
+            const savedTheme = localStorage.getItem('quantagent_theme') || 'light';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        })();
+    </script>
     <style>
         :root {
-            --etrade-purple: #241056;
-            --etrade-purple-light: #5627D8;
-            --etrade-purple-dark: #1A0B3A;
-            --etrade-purple-bg: #F8F5FF;
+            --etrade-purple: #17110A;
+            --etrade-purple-light: #C8A044;
+            --etrade-purple-dark: #050505;
+            --etrade-purple-bg: #F8F4EA;
+            --page-bg: #F7F1E7;
+            --surface-bg: #ffffff;
+            --surface-muted: #FBF8F0;
+            --toolbar-bg: rgba(255, 252, 245, 0.92);
+            --toolbar-border: rgba(200, 160, 68, 0.28);
+            --text-primary: #1A1712;
+            --text-secondary: #4B4337;
+            --text-muted: #7B7163;
+            --input-bg: #ffffff;
+            --soft-shadow: 0 25px 50px -12px rgba(23, 17, 10, 0.24);
+            --panel-shadow: 0 12px 28px rgba(23, 17, 10, 0.08);
             --white: #ffffff;
             --gray-50: #F9FAFB;
             --gray-100: #F3F4F6;
@@ -25,26 +42,58 @@
             --gray-900: #111827;
         }
 
+        :root[data-theme="dark"] {
+            --etrade-purple: #F2D178;
+            --etrade-purple-light: #D2A94F;
+            --etrade-purple-dark: #050505;
+            --etrade-purple-bg: #090806;
+            --page-bg: #090806;
+            --surface-bg: #14110C;
+            --surface-muted: #201A11;
+            --toolbar-bg: rgba(10, 8, 6, 0.94);
+            --toolbar-border: rgba(210, 169, 79, 0.3);
+            --text-primary: #F7F0DF;
+            --text-secondary: #D9C9A7;
+            --text-muted: #A89772;
+            --input-bg: #0E0C09;
+            --soft-shadow: 0 24px 52px rgba(0, 0, 0, 0.46);
+            --panel-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
+            --white: #171C26;
+            --gray-50: #202838;
+            --gray-100: #263041;
+            --gray-200: #303A4D;
+            --gray-300: #42506A;
+            --gray-400: #7C8BA6;
+            --gray-500: #9AA8BA;
+            --gray-600: #C7D0DD;
+            --gray-700: #DDE5EE;
+            --gray-800: #EEF2F7;
+            --gray-900: #F8FAFC;
+        }
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: var(--etrade-purple-bg);
-            color: var(--gray-800);
+            background: var(--page-bg);
+            color: var(--text-primary);
             line-height: 1.6;
             margin: 0;
             padding: 0;
+            transition: background 0.25s ease, color 0.25s ease;
         }
 
         .main-container {
             background: var(--white);
             border-radius: 20px;
-            box-shadow: 0 25px 50px -12px rgba(36, 16, 86, 0.25);
+            box-shadow: var(--soft-shadow);
             margin: 2rem auto;
             max-width: 1200px;
             overflow: hidden;
         }
 
         .header {
-            background: linear-gradient(135deg, var(--etrade-purple) 0%, var(--etrade-purple-light) 100%);
+            background:
+                radial-gradient(circle at 50% 18%, rgba(200, 160, 68, 0.22), transparent 32%),
+                linear-gradient(135deg, #050505 0%, #17110A 58%, #C8A044 160%);
             color: var(--white);
             padding: 3rem 2rem;
             text-align: center;
@@ -123,7 +172,7 @@
          
          .panel:hover {
              border-color: var(--etrade-purple-light);
-             box-shadow: 0 8px 24px rgba(86, 39, 216, 0.1);
+             box-shadow: 0 8px 24px rgba(23, 17, 10, 0.08);
          }
          
                  .panel-title {
@@ -146,7 +195,7 @@
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            filter: drop-shadow(0 2px 4px rgba(86, 39, 216, 0.2));
+            filter: drop-shadow(0 2px 4px rgba(200, 160, 68, 0.28));
         }
 
         /* Large Panel Styling */
@@ -163,7 +212,7 @@
 
         .large-panel:hover {
             border-color: var(--etrade-purple-light);
-            box-shadow: 0 8px 24px rgba(86, 39, 216, 0.1);
+            box-shadow: 0 8px 24px rgba(23, 17, 10, 0.08);
         }
 
         .large-panel-title {
@@ -186,7 +235,7 @@
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            filter: drop-shadow(0 3px 6px rgba(86, 39, 216, 0.3));
+            filter: drop-shadow(0 3px 6px rgba(200, 160, 68, 0.28));
         }
 
         .large-panel-content {
@@ -447,17 +496,31 @@
             padding: 1rem 2rem;
             border-radius: 15px;
             font-weight: 600;
-            display: inline-block;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.7rem;
+            min-width: 12rem;
+            box-shadow: 0 12px 24px rgba(23, 17, 10, 0.14);
         }
 
         .decision-long {
-            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-            color: var(--white);
+            background: linear-gradient(135deg, #D92D20 0%, #F04438 100%);
+            color: #fff;
         }
 
         .decision-short {
-            background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%);
-            color: var(--white);
+            background: linear-gradient(135deg, #059669 0%, #16A34A 100%);
+            color: #fff;
+        }
+
+        .decision-neutral {
+            background: linear-gradient(135deg, #6B7280 0%, #9CA3AF 100%);
+            color: #fff;
+        }
+
+        .decision-badge i {
+            font-size: 1.15em;
         }
 
         .image-container {
@@ -484,6 +547,63 @@
             box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
             display: block;
             margin: 0 auto;
+        }
+
+        .analysis-split {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: 2rem;
+            margin-top: 1rem;
+            align-items: start;
+        }
+
+        .chart-panel .panel-title {
+            position: relative;
+        }
+
+        .chart-expand-btn {
+            position: absolute;
+            right: 0;
+            width: 42px;
+            height: 42px;
+            border: 1px solid var(--gray-300);
+            border-radius: 8px;
+            background: var(--white);
+            color: var(--etrade-purple);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .analysis-split.is-expanded {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .analysis-split.is-expanded .chart-panel {
+            grid-row: 1;
+        }
+
+        .analysis-split.is-expanded .analysis-text-panel {
+            grid-row: 2;
+        }
+
+        .analysis-split.is-expanded .analysis-image {
+            width: 100%;
+        }
+
+        @media (max-width: 900px) {
+            .analysis-split {
+                grid-template-columns: minmax(0, 1fr);
+            }
+
+            .chart-panel {
+                grid-row: 1;
+            }
+
+            .analysis-text-panel {
+                grid-row: 2;
+            }
         }
         
         .image-container {
@@ -523,7 +643,273 @@
         .align-items-center { align-items: center; }
         .btn { display: inline-block; }
 
+        #technicalIndicatorPanel,
+        #patternAnalysisLayout,
+        #trendPanel {
+            scroll-margin-top: 96px;
+        }
+
+        .top-action-bar {
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 0.8rem clamp(1rem, 4vw, 3rem);
+            background: var(--toolbar-bg);
+            border-bottom: 1px solid var(--toolbar-border);
+            backdrop-filter: blur(16px);
+            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+        }
+
+        .top-action-left,
+        .top-action-right {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            flex-wrap: wrap;
+        }
+
+        .top-action-btn,
+        .account-menu-btn,
+        .theme-toggle-btn {
+            min-height: 42px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.45rem;
+            border: 1px solid var(--toolbar-border);
+            border-radius: 8px;
+            background: var(--surface-bg);
+            color: var(--text-primary);
+            padding: 0.55rem 0.85rem;
+            font-weight: 700;
+            text-decoration: none;
+            cursor: pointer;
+            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+            transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease, color 0.16s ease;
+        }
+
+        .top-action-btn:hover,
+        .account-menu-btn:hover,
+        .theme-toggle-btn:hover {
+            transform: translateY(-1px);
+            border-color: var(--etrade-purple-light);
+            color: var(--etrade-purple-light);
+        }
+
+        .theme-toggle-btn {
+            width: 42px;
+            padding: 0;
+        }
+
+        .account-menu {
+            position: relative;
+        }
+
+        .account-dropdown {
+            position: absolute;
+            top: calc(100% + 0.6rem);
+            right: 0;
+            width: 190px;
+            display: none;
+            flex-direction: column;
+            padding: 0.5rem;
+            border: 1px solid var(--toolbar-border);
+            border-radius: 8px;
+            background: var(--surface-bg);
+            box-shadow: 0 18px 46px rgba(15, 23, 42, 0.22);
+        }
+
+        .account-menu.is-open .account-dropdown {
+            display: flex;
+        }
+
+        .account-dropdown a,
+        .account-dropdown button {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            padding: 0.7rem 0.75rem;
+            border-radius: 6px;
+            color: var(--text-primary);
+            background: transparent;
+            border: 0;
+            text-decoration: none;
+            font-weight: 700;
+            text-align: left;
+            cursor: pointer;
+        }
+
+        .account-dropdown a:hover,
+        .account-dropdown button:hover {
+            background: var(--surface-muted);
+            color: var(--etrade-purple-light);
+        }
+
+        .membership-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 2600;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            background: rgba(8, 11, 20, 0.58);
+            backdrop-filter: blur(10px);
+        }
+
+        .membership-modal.is-visible {
+            display: flex;
+        }
+
+        .membership-card {
+            width: min(980px, 100%);
+            max-height: calc(100vh - 4rem);
+            overflow: auto;
+            border-radius: 14px;
+            background: var(--surface-bg);
+            color: var(--text-primary);
+            box-shadow: 0 30px 90px rgba(0, 0, 0, 0.32);
+            padding: 2rem;
+        }
+
+        .membership-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .membership-header h2 {
+            margin: 0;
+            color: var(--text-primary);
+            font-size: 1.8rem;
+        }
+
+        .modal-close-btn {
+            width: 42px;
+            height: 42px;
+            border-radius: 8px;
+            border: 0;
+            background: var(--surface-muted);
+            color: var(--text-primary);
+            cursor: pointer;
+        }
+
+        .membership-plans {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 1rem;
+        }
+
+        .membership-plan {
+            border: 2px solid var(--gray-200);
+            border-radius: 12px;
+            padding: 1.25rem;
+            background: var(--surface-muted);
+        }
+
+        .membership-plan h3 {
+            margin: 0 0 0.5rem;
+            color: var(--etrade-purple);
+            font-size: 1.35rem;
+        }
+
+        .membership-price {
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+            font-size: 1.6rem;
+            font-weight: 850;
+        }
+
+        .qr-box {
+            height: 150px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px dashed var(--gray-400);
+            border-radius: 10px;
+            background: var(--surface-bg);
+            color: var(--text-secondary);
+            font-size: 1.35rem;
+            font-weight: 850;
+        }
+
+        :root[data-theme="dark"] .header {
+            background:
+                radial-gradient(circle at 50% 18%, rgba(242, 209, 120, 0.28), transparent 34%),
+                linear-gradient(135deg, #211A0E 0%, #3A2B12 58%, #7A5A1B 135%);
+        }
+
+        :root[data-theme="dark"] .main-container,
+        :root[data-theme="dark"] .results-section,
+        :root[data-theme="dark"] .panel,
+        :root[data-theme="dark"] .large-panel,
+        :root[data-theme="dark"] .large-panel-content,
+        :root[data-theme="dark"] .stats-card,
+        :root[data-theme="dark"] .image-container {
+            background: var(--surface-bg);
+            color: var(--text-primary);
+            box-shadow: var(--panel-shadow);
+        }
+
+        :root[data-theme="dark"] .main-container {
+            box-shadow: var(--soft-shadow);
+        }
+
+        :root[data-theme="dark"] pre,
+        :root[data-theme="dark"] table,
+        :root[data-theme="dark"] .table,
+        :root[data-theme="dark"] .large-panel-section {
+            background: var(--surface-muted) !important;
+            color: var(--text-primary) !important;
+            border-color: var(--gray-300) !important;
+        }
+
+        :root[data-theme="dark"] td,
+        :root[data-theme="dark"] th,
+        :root[data-theme="dark"] .chart-caption,
+        :root[data-theme="dark"] .stats-label,
+        :root[data-theme="dark"] .auto-beautify,
+        :root[data-theme="dark"] .form-group,
+        :root[data-theme="dark"] p {
+            color: var(--text-secondary);
+        }
+
+        :root[data-theme="dark"] .chart-expand-btn {
+            background: var(--surface-muted);
+            color: var(--etrade-purple-light);
+            border-color: var(--gray-300);
+        }
+
         @media (max-width: 768px) {
+            .top-action-bar {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .top-action-left,
+            .top-action-right {
+                width: 100%;
+            }
+
+            .top-action-btn {
+                flex: 1 1 9rem;
+            }
+
+            .top-action-right {
+                justify-content: flex-end;
+            }
+
+            .membership-plans {
+                grid-template-columns: 1fr;
+            }
+
             .col-md-4, .col-md-6 { flex: 0 0 100%; max-width: 100%; }
             .main-container { margin: 1rem; border-radius: 16px; }
             .results-section { padding: 2rem 1rem; }
@@ -552,6 +938,53 @@
     </style>
 </head>
 <body>
+    <nav class="top-action-bar" aria-label="QuantAgent shortcuts">
+        <div class="top-action-left">
+            <a class="top-action-btn" href="/"><i class="fas fa-home"></i> 首页</a>
+            <a class="top-action-btn" href="#technicalIndicatorPanel"><i class="fas fa-chart-bar"></i> 指标</a>
+            <a class="top-action-btn" href="#patternAnalysisLayout"><i class="fas fa-chart-bar"></i> K线</a>
+        </div>
+        <div class="top-action-right">
+            <button class="theme-toggle-btn" type="button" id="themeToggleBtn" onclick="toggleQuantAgentTheme()" title="切换背景颜色">
+                <i class="fas fa-moon"></i>
+            </button>
+            <div class="account-menu" id="accountMenu">
+                <button class="account-menu-btn" type="button" onclick="toggleAccountMenu(event)">
+                    <i class="fas fa-user-circle"></i> 我的 <i class="fas fa-chevron-down"></i>
+                </button>
+                <div class="account-dropdown" role="menu">
+                    <button type="button" role="menuitem" onclick="openMembershipModal()"><i class="fas fa-crown"></i> 会员</button>
+                    <a href="/#settings-panel" role="menuitem"><i class="fas fa-sliders-h"></i> 账户设置</a>
+                    <button type="button" role="menuitem" onclick="handleLogoutAction()"><i class="fas fa-sign-out-alt"></i> 退出登录</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+    <div class="membership-modal" id="membershipModal" aria-modal="true" role="dialog">
+        <div class="membership-card">
+            <div class="membership-header">
+                <h2><i class="fas fa-crown"></i> 会员中心</h2>
+                <button class="modal-close-btn" type="button" onclick="closeMembershipModal()"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="membership-plans">
+                <div class="membership-plan">
+                    <h3>1 个月</h3>
+                    <div class="membership-price">仅演示</div>
+                    <div class="qr-box">二维码</div>
+                </div>
+                <div class="membership-plan">
+                    <h3>3 个月</h3>
+                    <div class="membership-price">仅演示</div>
+                    <div class="qr-box">二维码</div>
+                </div>
+                <div class="membership-plan">
+                    <h3>一年</h3>
+                    <div class="membership-price">仅演示</div>
+                    <div class="qr-box">二维码</div>
+                </div>
+            </div>
+        </div>
+    </div>
     <div class="main-container">
         <!-- Header -->
         <div class="header">
@@ -595,7 +1028,7 @@
                          <div class="col-md-4 d-flex">
                              <div class="stats-card w-100">
                                  <div class="stats-number">{{ results.timeframe if results.timeframe else '1d' }}</div>
-                                 <div class="stats-label">Timeframe</div>
+                                 <div class="stats-label">时间间隔</div>
                              </div>
                          </div>
                          <div class="col-md-4 d-flex">
@@ -616,13 +1049,13 @@
                          {% set decision = results.final_trade_decision %}
                          {% set direction = results.decision_direction|default('') %}
                          {% if decision and ('LONG' in (decision|upper) or '做多' in direction or '做多' in (decision|upper) or '做多' in decision) %}
-                             <span class="decision-badge decision-long">做多 (LONG)</span>
+                             <span class="decision-badge decision-long"><i class="fas fa-arrow-trend-up"></i> 做多 (LONG)</span>
                          {% elif decision and ('SHORT' in (decision|upper) or '做空' in direction or '做空' in (decision|upper) or '做空' in decision) %}
-                             <span class="decision-badge decision-short">做空 (SHORT)</span>
+                             <span class="decision-badge decision-short"><i class="fas fa-arrow-trend-down"></i> 做空 (SHORT)</span>
                          {% elif decision %}
-                             <span class="decision-badge decision-long">待分析</span>
+                             <span class="decision-badge decision-neutral"><i class="fas fa-arrow-right"></i> 待分析</span>
                          {% else %}
-                             <span class="decision-badge" style="background: linear-gradient(135deg, #6B7280 0%, #9CA3AF 100%); color: white;">暂无决策</span>
+                             <span class="decision-badge decision-neutral"><i class="fas fa-minus"></i> 暂无决策</span>
                          {% endif %}
                      </div>
                      {% if decision %}
@@ -684,7 +1117,7 @@
                  </div>
 
                                  <!-- Technical Indicators Panel -->
-                <div class="large-panel">
+                <div class="large-panel" id="technicalIndicatorPanel">
                     <h3 class="large-panel-title">
                         <i class="fas fa-chart-bar"></i> 技术指标分析
                     </h3>
@@ -698,7 +1131,7 @@
                 </div>
 
                  <!-- Technical Indicator Values -->
-                <div class="large-panel">
+                <div class="large-panel" id="technicalIndicatorValuesPanel">
                     <h3 class="large-panel-title">
                         <i class="fas fa-table"></i> 技术指标数值
                     </h3>
@@ -751,13 +1184,13 @@
 
             
                                      <!-- Pattern Agent: Pattern Recognition + Pattern Visualization -->
-            <div class="large-panel">
+            <div class="large-panel" id="patternPanel">
                 <h3 class="large-panel-title">
                     <i class="fas fa-brain"></i> K线形态识别
                 </h3>
-                <div style="display: flex; gap: 2rem; margin-top: 1rem;">
+                <div class="analysis-split" id="patternAnalysisLayout">
                     <!-- Left Panel: Pattern Recognition -->
-                    <div class="panel" style="flex: 1;">
+                    <div class="panel analysis-text-panel">
                         <h4 class="panel-title">
                             <i class="fas fa-search"></i> 形态识别结果
                         </h4>
@@ -781,9 +1214,12 @@
                     </div>
                     
                     <!-- Right Panel: Pattern Visualization -->
-                    <div class="panel" style="flex: 1;">
+                    <div class="panel chart-panel">
                         <h4 class="panel-title">
                             <i class="fas fa-chart-bar"></i> K线图表
+                            <button class="chart-expand-btn" type="button" onclick="toggleChartExpansion('patternAnalysisLayout', this)" title="放大 K 线图">
+                                <i class="fas fa-expand"></i>
+                            </button>
                         </h4>
                         <div class="image-container">
                             {% if results.pattern_chart %}
@@ -798,14 +1234,14 @@
             </div>
              
                          <!-- Trend Agent: Trend Analysis + Trend Chart -->
-            <div class="large-panel">
+            <div class="large-panel" id="trendPanel">
                 <h3 class="large-panel-title">
                     <i class="fas fa-chart-line"></i> 趋势分析
                 </h3>
                 <div class="large-panel-content">
-                    <div style="display: flex; gap: 2rem; margin-top: 1rem;">
+                    <div class="analysis-split" id="trendAnalysisLayout">
                         <!-- Left Panel: Trend Analysis -->
-                        <div class="panel" style="flex: 1;">
+                        <div class="panel analysis-text-panel">
                             <h4 class="panel-title">
                                 <i class="fas fa-analytics"></i> 趋势分析结果
                             </h4>
@@ -819,9 +1255,12 @@
                         </div>
 
                         <!-- Right Panel: Trend Chart -->
-                        <div class="panel" style="flex: 1;">
+                        <div class="panel chart-panel">
                             <h4 class="panel-title">
                                 <i class="fas fa-chart-area"></i> 趋势图表
+                                <button class="chart-expand-btn" type="button" onclick="toggleChartExpansion('trendAnalysisLayout', this)" title="放大趋势图">
+                                    <i class="fas fa-expand"></i>
+                                </button>
                             </h4>
                             <div class="image-container">
                                 {% if results.trend_chart %}
@@ -843,6 +1282,71 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script>
+        function applyQuantAgentTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('quantagent_theme', theme);
+            const button = document.getElementById('themeToggleBtn');
+            if (button) {
+                const isDark = theme === 'dark';
+                button.title = isDark ? '切换浅色背景' : '切换深色背景';
+                button.querySelector('i').className = isDark ? 'fas fa-sun' : 'fas fa-moon';
+            }
+        }
+
+        function toggleQuantAgentTheme() {
+            const current = document.documentElement.getAttribute('data-theme') || 'light';
+            applyQuantAgentTheme(current === 'dark' ? 'light' : 'dark');
+        }
+
+        function toggleAccountMenu(event) {
+            event.stopPropagation();
+            document.getElementById('accountMenu')?.classList.toggle('is-open');
+        }
+
+        function openMembershipModal() {
+            document.getElementById('accountMenu')?.classList.remove('is-open');
+            document.getElementById('membershipModal')?.classList.add('is-visible');
+        }
+
+        function closeMembershipModal() {
+            document.getElementById('membershipModal')?.classList.remove('is-visible');
+        }
+
+        function handleLogoutAction() {
+            document.getElementById('accountMenu')?.classList.remove('is-open');
+            localStorage.removeItem('quantagent_auth');
+            window.location.href = '/';
+        }
+
+        document.addEventListener('click', function (event) {
+            const menu = document.getElementById('accountMenu');
+            if (menu && !menu.contains(event.target)) {
+                menu.classList.remove('is-open');
+            }
+        });
+
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape') {
+                document.getElementById('accountMenu')?.classList.remove('is-open');
+                closeMembershipModal();
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', function () {
+            if (localStorage.getItem('quantagent_auth') !== 'true') {
+                window.location.href = '/';
+                return;
+            }
+            applyQuantAgentTheme(localStorage.getItem('quantagent_theme') || 'light');
+        });
+
+        function toggleChartExpansion(layoutId, button) {
+            const layout = document.getElementById(layoutId);
+            const expanded = layout.classList.toggle('is-expanded');
+            button.title = expanded ? '还原图表布局' : '放大图表';
+            button.querySelector('i').className = expanded ? 'fas fa-compress' : 'fas fa-expand';
+        }
+
         // Helper: find the .large-panel that contains an icon matching the given class
         function findLargePanelByIcon(iconClass) {
             const icon = document.querySelector('.' + iconClass);
@@ -857,9 +1361,63 @@
             return icon.closest('.panel');
         }
 
-        // Render analysis results from sessionStorage
+        function hasReportText(value) {
+            return typeof value === 'string' && value.trim().length > 0 && !value.toLowerCase().includes('waiting');
+        }
+
+        function latestNumber(values) {
+            if (!Array.isArray(values) || values.length === 0) return null;
+            const value = Number(values[values.length - 1]);
+            return Number.isFinite(value) ? value : null;
+        }
+
+        function buildClientIndicatorFallback(indicators) {
+            const rsi = latestNumber(indicators?.rsi);
+            const macd = latestNumber(indicators?.macd);
+            const signal = latestNumber(indicators?.macd_signal);
+            const stochK = latestNumber(indicators?.stoch_k);
+            const willr = latestNumber(indicators?.willr);
+            const lines = ['### 技术指标分析', ''];
+            if (rsi !== null) lines.push(`- RSI 当前约为 ${rsi.toFixed(2)}，整体处于${rsi >= 70 ? '偏热' : rsi <= 30 ? '偏冷' : '中性'}区间。`);
+            if (macd !== null && signal !== null) lines.push(`- MACD 当前为 ${macd.toFixed(4)}，${macd >= signal ? '强于' : '弱于'}信号线 ${signal.toFixed(4)}。`);
+            if (stochK !== null) lines.push(`- 随机指标 %K 当前约为 ${stochK.toFixed(2)}，可结合价格位置观察短线动能。`);
+            if (willr !== null) lines.push(`- 威廉指标 %R 当前约为 ${willr.toFixed(2)}，用于辅助判断超买超卖状态。`);
+            if (lines.length === 2) lines.push('- 本次报告未返回完整技术指标文字，请参考下方指标数值表。');
+            lines.push('', '以上为本地兜底生成的技术指标摘要。');
+            return lines.join('\n');
+        }
+
+        function buildClientTrendFallback(result) {
+            const asset = result.asset_name || '当前资产';
+            const timeframe = result.timeframe || '当前周期';
+            return [
+                '### 趋势分析',
+                '',
+                `- ${asset} 在 ${timeframe} 周期下已生成趋势图，可结合图中支撑线和阻力线观察价格方向。`,
+                '- 若价格持续站上阻力区域，短线动能可能增强；若跌破支撑区域，需要留意回撤风险。',
+                '- 当前报告未返回完整趋势文字，因此此处显示本地兜底摘要。',
+            ].join('\n');
+        }
+
+        function setDecisionBadge(badge, type) {
+            if (!badge) return;
+            badge.style.background = '';
+            badge.style.color = '';
+            if (type === 'long') {
+                badge.className = 'decision-badge decision-long';
+                badge.innerHTML = '<i class="fas fa-arrow-trend-up"></i> 做多 (LONG)';
+            } else if (type === 'short') {
+                badge.className = 'decision-badge decision-short';
+                badge.innerHTML = '<i class="fas fa-arrow-trend-down"></i> 做空 (SHORT)';
+            } else {
+                badge.className = 'decision-badge decision-neutral';
+                badge.innerHTML = '<i class="fas fa-arrow-right"></i> 暂无明确方向';
+            }
+        }
+
+        // Render analysis results from sessionStorage, with localStorage fallback for returning to the last report
         document.addEventListener('DOMContentLoaded', function() {
-            const raw = sessionStorage.getItem('analysisResults');
+            const raw = sessionStorage.getItem('analysisResults') || localStorage.getItem('quantagent_last_analysis_results');
             if (!raw) return;
 
             let r;
@@ -868,7 +1426,14 @@
                 return;
             }
 
-            console.log('Rendering analysis results from sessionStorage:', r);
+            localStorage.setItem('quantagent_last_analysis_results', raw);
+            if (!hasReportText(r.indicator_report)) {
+                r.indicator_report = buildClientIndicatorFallback(r.indicators || {});
+            }
+            if (!hasReportText(r.trend_report)) {
+                r.trend_report = buildClientTrendFallback(r);
+            }
+            console.log('Rendering cached analysis results:', r);
 
             // --- Stats cards ---
             const stats = document.querySelectorAll('.stats-number');
@@ -891,16 +1456,11 @@
                     const upper = r.final_trade_decision.toUpperCase();
                     const dir = (r.decision_direction || '').toUpperCase();
                     if (upper.includes('LONG') || upper.includes('做多') || dir.includes('做多')) {
-                        badge.className = 'decision-badge decision-long';
-                        badge.textContent = '做多 (LONG)';
+                        setDecisionBadge(badge, 'long');
                     } else if (upper.includes('SHORT') || upper.includes('做空') || dir.includes('做空')) {
-                        badge.className = 'decision-badge decision-short';
-                        badge.textContent = '做空 (SHORT)';
+                        setDecisionBadge(badge, 'short');
                     } else {
-                        badge.className = 'decision-badge';
-                        badge.style.background = 'linear-gradient(135deg, #6B7280 0%, #9CA3AF 100%)';
-                        badge.style.color = 'white';
-                        badge.textContent = '暂无明确方向';
+                        setDecisionBadge(badge, 'neutral');
                     }
                 }
             } else if (r.decision_direction) {
@@ -909,11 +1469,11 @@
                 if (badge) {
                     const dir = r.decision_direction.toUpperCase();
                     if (dir.includes('做多') || dir.includes('LONG')) {
-                        badge.className = 'decision-badge decision-long';
-                        badge.textContent = '做多 (LONG)';
+                        setDecisionBadge(badge, 'long');
                     } else if (dir.includes('做空') || dir.includes('SHORT')) {
-                        badge.className = 'decision-badge decision-short';
-                        badge.textContent = '做空 (SHORT)';
+                        setDecisionBadge(badge, 'short');
+                    } else {
+                        setDecisionBadge(badge, 'neutral');
                     }
                 }
             }
@@ -959,7 +1519,7 @@
 
             // --- Indicator report (技术指标分析) ---
             if (r.indicator_report) {
-                const indicatorPanel = findLargePanelByIcon('fa-chart-bar');
+                const indicatorPanel = document.getElementById('technicalIndicatorPanel');
                 if (indicatorPanel) {
                     const section = indicatorPanel.querySelector('.large-panel-section');
                     if (section) {
@@ -974,7 +1534,7 @@
                     return Array.isArray(v) && v.length > 0;
                 });
                 if (hasAnyIndicator) {
-                    const tablePanel = findLargePanelByIcon('fa-table');
+                    const tablePanel = document.getElementById('technicalIndicatorValuesPanel');
                     if (tablePanel) {
                         // Remove "waiting" paragraph
                         const waitP = tablePanel.querySelector('p.text-muted, p.text-center');
@@ -1016,7 +1576,7 @@
 
             // --- Pattern report + chart (K线形态识别) ---
             if (r.pattern_report) {
-                const patternPanel = findLargePanelByIcon('fa-brain');
+                const patternPanel = document.getElementById('patternPanel');
                 if (patternPanel) {
                     // Find the left sub-panel (识别形态) by the fa-search icon
                     const leftPanel = patternPanel.querySelector('.panel-title i.fa-search')?.closest('.panel');
@@ -1048,7 +1608,7 @@
 
             // --- Trend report + chart (趋势分析) ---
             if (r.trend_report) {
-                const trendPanel = findLargePanelByIcon('fa-chart-line');
+                const trendPanel = document.getElementById('trendPanel');
                 if (trendPanel) {
                     // Find the left sub-panel (趋势分析结果) by the fa-analytics icon
                     const leftPanel = trendPanel.querySelector('.panel-title i.fa-analytics')?.closest('.panel');

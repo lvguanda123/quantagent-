@@ -6,7 +6,7 @@ Uses LLM and toolkit to compute and interpret indicators like MACD, RSI, ROC, St
 import copy
 import json
 
-from langchain_core.messages import ToolMessage, HumanMessage
+from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 
@@ -35,6 +35,33 @@ def create_indicator_agent(llm, toolkit):
             toolkit.compute_willr,
         ]
         time_frame = state["time_frame"]
+
+        provider_kind = (getattr(llm, "metadata", {}) or {}).get("quantagent_provider")
+        if provider_kind in ("sohu", "custom_http", "custom_anthropic"):
+            tool_results = {}
+            for tool_fn in tools:
+                tool_results.update(
+                    tool_fn.invoke({"kline_data": copy.deepcopy(state["kline_data"])})
+                )
+            compact_results = {
+                key: value[-5:] if isinstance(value, list) else value
+                for key, value in tool_results.items()
+            }
+            response = llm.invoke(
+                [
+                    SystemMessage(
+                        content="你是技术指标分析助手。请根据已计算的指标，用中文给出简洁、明确的市场分析。"
+                    ),
+                    HumanMessage(
+                        content=f"周期：{time_frame}\n最近指标：\n{json.dumps(compact_results, ensure_ascii=False)}"
+                    ),
+                ]
+            )
+            return {
+                "messages": [response],
+                "indicator_report": response.content,
+                **tool_results,
+            }
         # --- System prompt for LLM ---
         prompt = ChatPromptTemplate.from_messages(
             [
