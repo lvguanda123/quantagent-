@@ -5,6 +5,8 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+!desktop/tauri/dist/
+!desktop/tauri/dist/index.html
 
 # Generated images & files
 kline_chart.png
@@ -42,3 +44,12 @@ Thumbs.db
 # Environment secrets
 .env
 .env.local
+cat >> .gitignore <<'EOF'
+
+# release artifacts
+*.zip
+*.dmg
+*.exe
+*.msi
+desktop/tauri/src-tauri/target/
+desktop/tauri/target/

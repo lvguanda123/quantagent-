@@ -1,0 +1,87 @@
+name: Build Windows Tauri
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - neoding-demo
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        shell: bash
+        run: |
+          python -m venv .venv
+          .venv/Scripts/python.exe -m pip install --upgrade pip
+          .venv/Scripts/python.exe -m pip install -r requirements.txt
+
+      - name: Install frontend dependencies
+        working-directory: desktop/tauri
+        run: npm install
+
+      - name: Reset Cargo registry config
+        shell: bash
+        run: |
+          rm -f ~/.cargo/config
+          rm -f ~/.cargo/config.toml
+          rm -f .cargo/config
+          rm -f .cargo/config.toml
+          rm -f desktop/tauri/.cargo/config
+          rm -f desktop/tauri/.cargo/config.toml
+          rm -f desktop/tauri/src-tauri/.cargo/config
+          rm -f desktop/tauri/src-tauri/.cargo/config.toml
+          rm -rf ~/.cargo/registry/index/*
+          cargo --version
+
+      - name: Prepare bundled backend
+        working-directory: desktop/tauri
+        shell: bash
+        run: |
+          node scripts/prepare-backend.mjs
+          rm -rf src-tauri/bundled-backend
+          cp -R bundled-backend src-tauri/bundled-backend
+          ls -la bundled-backend
+          ls -la src-tauri/bundled-backend
+          test -f bundled-backend/python-runtime/python.exe
+          bundled-backend/python-runtime/python.exe --version
+          bundled-backend/python-runtime/python.exe -c "import sys; sys.path.insert(0, r'bundled-backend/python/site-packages'); import flask, requests; print('Bundled Python runtime OK')"
+
+      - name: Build Tauri Windows app
+        working-directory: desktop/tauri
+        env:
+          CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+        run: npm run build -- --verbose
+
+      - name: Show build outputs
+        shell: bash
+        run: |
+          echo "Listing likely Windows outputs:"
+          find desktop/tauri/src-tauri/target -type f \( -name "*.exe" -o -name "*.msi" -o -name "*.zip" \) | sort
+
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: QuantAgent-Windows-Setup
+          if-no-files-found: error
+          path: |
+            desktop/tauri/src-tauri/target/release/bundle/nsis/*.exe
+            desktop/tauri/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe

@@ -6,6 +6,9 @@ Combines indicator, pattern, and trend reports to issue a LONG or SHORT order.
 import json
 import re
 
+import requests
+from langchain_core.messages import AIMessage
+
 
 def _extract_json(text: str) -> dict | None:
     """Extract JSON block from LLM response text."""
@@ -37,8 +40,20 @@ def create_final_trade_decider(llm):
         time_frame = state["time_frame"]
         stock_name = state["stock_name"]
 
-        # --- System prompt for LLM ---
-        prompt = f"""你是一位高频量化交易（HFT）分析师，当前正在分析 {stock_name} 的 {time_frame} K线图。你的任务是给出**立即执行指令**：**做多（LONG）**或**做空（SHORT）**。⚠️ 由于是HFT环境，禁止持有观望（HOLD）。
+        is_sohu = (getattr(llm, "metadata", {}) or {}).get("quantagent_provider") == "sohu"
+
+        if is_sohu:
+            prompt = f"""你是量化交易决策助手。请根据三份AI分析，为 {stock_name} 的 {time_frame} K线给出做多或做空决策。
+只输出一个中文JSON对象，不要代码块或额外文字，字段必须为：预测周期、决策、入场价格、止损价格、止盈价格、理由、风险收益比。
+决策只能是“做多”或“做空”；风险收益比应在1.2到1.8之间；理由保持简洁。
+
+技术指标：{indicator_report[:800]}
+形态分析：{pattern_report[:800]}
+趋势分析：{trend_report[:800]}
+"""
+        else:
+            # --- System prompt for LLM ---
+            prompt = f"""你是一位高频量化交易（HFT）分析师，当前正在分析 {stock_name} 的 {time_frame} K线图。你的任务是给出**立即执行指令**：**做多（LONG）**或**做空（SHORT）**。⚠️ 由于是HFT环境，禁止持有观望（HOLD）。
 
 你的决策应预测**未来 N 根K线**的市场走势，其中：
 - 例如：TIME_FRAME = 15min, N = 1 → 预测未来15分钟。
@@ -117,7 +132,17 @@ def create_final_trade_decider(llm):
         """
 
         # --- LLM call for decision ---
-        response = llm.invoke(prompt)
+        try:
+            response = llm.invoke(prompt)
+        except requests.exceptions.RequestException as exc:
+            if not is_sohu:
+                raise
+            response = AIMessage(
+                content=(
+                    "搜狐模型生成最终交易决策时连接超时。"
+                    "技术指标、形态与趋势分析已保留，请稍后重新分析以获取最终交易决策。"
+                )
+            )
 
         # Try to parse structured output and extract trade fields
         result = _extract_json(response.content)
