@@ -1047,11 +1047,14 @@
                      </h4>
                      <div class="text-center mb-3">
                          {% set decision = results.final_trade_decision %}
-                         {% set direction = results.decision_direction|default('') %}
-                         {% if decision and ('LONG' in (decision|upper) or '做多' in direction or '做多' in (decision|upper) or '做多' in decision) %}
+                         {% set direction = (results.decision_direction|default(''))|string|trim %}
+                         {# 以结构化 decision_direction 为唯一权威，避免“理由”文本同时含做多/做空导致误判 #}
+                         {% if direction and ('做多' in direction or 'LONG' in direction|upper) %}
                              <span class="decision-badge decision-long"><i class="fas fa-arrow-trend-up"></i> 做多 (LONG)</span>
-                         {% elif decision and ('SHORT' in (decision|upper) or '做空' in direction or '做空' in (decision|upper) or '做空' in decision) %}
+                         {% elif direction and ('做空' in direction or 'SHORT' in direction|upper) %}
                              <span class="decision-badge decision-short"><i class="fas fa-arrow-trend-down"></i> 做空 (SHORT)</span>
+                         {% elif direction and ('观望' in direction or '中性' in direction or 'HOLD' in direction|upper or 'NEUTRAL' in direction|upper) %}
+                             <span class="decision-badge decision-neutral"><i class="fas fa-arrow-right"></i> 观望 (HOLD)</span>
                          {% elif decision %}
                              <span class="decision-badge decision-neutral"><i class="fas fa-arrow-right"></i> 待分析</span>
                          {% else %}
@@ -1415,6 +1418,32 @@
             }
         }
 
+        // 判定多空方向：以结构化字段 decision_direction 为权威；
+        // 若缺失，则从 final_trade_decision 的 JSON 中解析“决策”/decision 字段，
+        // 绝不扫描整段理由文本（其中常同时出现“做多/做空”导致误判）。
+        function resolveDecisionType(r) {
+            const dir = (r.decision_direction || r.decision || '').toString().trim().toUpperCase();
+            if (dir) {
+                if (dir.includes('做多') || dir.includes('LONG') || dir.includes('看多')) return 'long';
+                if (dir.includes('做空') || dir.includes('SHORT') || dir.includes('看空')) return 'short';
+                if (dir.includes('观望') || dir.includes('中性') || dir.includes('HOLD') || dir.includes('NEUTRAL')) return 'neutral';
+            }
+            const raw = r.final_trade_decision;
+            if (raw) {
+                let parsed = null;
+                try { parsed = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch (e) {
+                    const m = raw.match(/\{[\s\S]*\}/);
+                    if (m) { try { parsed = JSON.parse(m[0]); } catch (_) {} }
+                }
+                if (parsed && typeof parsed === 'object') {
+                    const decisionVal = (parsed['决策'] ?? parsed.decision ?? parsed.direction ?? '').toString().trim().toUpperCase();
+                    if (decisionVal.includes('做多') || decisionVal.includes('LONG') || decisionVal.includes('看多')) return 'long';
+                    if (decisionVal.includes('做空') || decisionVal.includes('SHORT') || decisionVal.includes('看空')) return 'short';
+                }
+            }
+            return 'neutral';
+        }
+
         // Render analysis results from sessionStorage, with localStorage fallback for returning to the last report
         document.addEventListener('DOMContentLoaded', function() {
             const raw = sessionStorage.getItem('analysisResults') || localStorage.getItem('quantagent_last_analysis_results');
@@ -1453,28 +1482,13 @@
                 }
                 const badge = document.querySelector('.decision-badge');
                 if (badge) {
-                    const upper = r.final_trade_decision.toUpperCase();
-                    const dir = (r.decision_direction || '').toUpperCase();
-                    if (upper.includes('LONG') || upper.includes('做多') || dir.includes('做多')) {
-                        setDecisionBadge(badge, 'long');
-                    } else if (upper.includes('SHORT') || upper.includes('做空') || dir.includes('做空')) {
-                        setDecisionBadge(badge, 'short');
-                    } else {
-                        setDecisionBadge(badge, 'neutral');
-                    }
+                    setDecisionBadge(badge, resolveDecisionType(r));
                 }
-            } else if (r.decision_direction) {
-                // Only direction available but no final_trade_decision
+            } else {
+                // 没有 final_trade_decision，但可能仍有结构化方向
                 const badge = document.querySelector('.decision-badge');
-                if (badge) {
-                    const dir = r.decision_direction.toUpperCase();
-                    if (dir.includes('做多') || dir.includes('LONG')) {
-                        setDecisionBadge(badge, 'long');
-                    } else if (dir.includes('做空') || dir.includes('SHORT')) {
-                        setDecisionBadge(badge, 'short');
-                    } else {
-                        setDecisionBadge(badge, 'neutral');
-                    }
+                if (badge && (r.decision_direction || r.decision)) {
+                    setDecisionBadge(badge, resolveDecisionType(r));
                 }
             }
 

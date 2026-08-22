@@ -19,6 +19,7 @@ const backendFiles = [
   "default_config.py",
   "graph_setup.py",
   "graph_util.py",
+  "history_store.py",
   "indicator_agent.py",
   "pattern_agent.py",
   "proxy_fix.py",

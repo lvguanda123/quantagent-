@@ -10,18 +10,50 @@ import requests
 from langchain_core.messages import AIMessage
 
 
-def _extract_json(text: str) -> dict | None:
+def _to_text(content) -> str:
+    """Normalise an LLM response's .content to plain text.
+
+    Some Anthropic-compatible endpoints (e.g. 火山方舟 Ark) return content as a
+    list of content blocks like [{"type": "text", "text": "..."}] instead of a
+    plain string. Join those blocks so downstream parsing works either way.
+    """
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for block in content:
+            if isinstance(block, str):
+                parts.append(block)
+            elif isinstance(block, dict):
+                text = block.get("text") or block.get("content") or ""
+                if text:
+                    parts.append(str(text))
+            else:
+                parts.append(str(block))
+        return "".join(parts)
+    return "" if content is None else str(content)
+
+
+def _extract_json(text) -> dict | None:
     """Extract JSON block from LLM response text."""
+    text = _to_text(text)
     # Try direct JSON parse first
     try:
         return json.loads(text)
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, TypeError):
         pass
     # Try to find JSON in code block
     match = re.search(r'```(?:json)?\s*([\s\S]*?)```', text)
     if match:
         try:
             return json.loads(match.group(1))
+        except json.JSONDecodeError:
+            pass
+    # Fall back to the first {...} object in the text
+    match = re.search(r'\{[\s\S]*\}', text)
+    if match:
+        try:
+            return json.loads(match.group(0))
         except json.JSONDecodeError:
             pass
     return None
@@ -146,8 +178,9 @@ def create_final_trade_decider(llm):
 
         # Try to parse structured output and extract trade fields
         result = _extract_json(response.content)
+        response_text = _to_text(response.content)
         state_update = {
-            "final_trade_decision": response.content,
+            "final_trade_decision": response_text,
             "messages": [response],
             "decision_prompt": prompt,
         }
