@@ -121,10 +121,40 @@ def format_analysis_error(message: str) -> str:
     return text
 
 
+def _apply_env_credentials(config: dict) -> None:
+    """Override config with API credentials from the environment / bundled .env.
+
+    Mutates ``config`` in place. Existing non-empty config values are kept only
+    when the corresponding environment variable is absent. Called both before
+    the trading graph is constructed (so its LLM clients pick up the key) and
+    after (to keep the running instance in sync).
+    """
+    anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    if anthropic_key:
+        config["anthropic_api_key"] = anthropic_key
+
+    anthropic_base = os.environ.get("ANTHROPIC_BASE_URL", "").strip()
+    if anthropic_base:
+        config["base_url"] = anthropic_base
+
+    anthropic_model = os.environ.get("ANTHROPIC_MODEL", "").strip()
+    if anthropic_model:
+        config["agent_llm_model"] = anthropic_model
+        config["graph_llm_model"] = anthropic_model
+
+    trial_key = os.environ.get("QUANTAGENT_TRIAL_API_KEY", "").strip()
+    if trial_key:
+        config["trial_api_key"] = trial_key
+
+
 class WebTradingAnalyzer:
     def __init__(self):
         from default_config import DEFAULT_CONFIG
         self.config = DEFAULT_CONFIG.copy()
+        # Apply credentials from environment / bundled .env BEFORE constructing
+        # the trading graph, because its LLM clients are initialised immediately
+        # and read the key from config (they do not fall back to os.environ).
+        _apply_env_credentials(self.config)
         self.trading_graph = TradingGraph(config=self.config)
 
     def normalize_akshare_timeframe(self, timeframe: str) -> str:
@@ -750,29 +780,12 @@ analyzer = WebTradingAnalyzer()
 analysis_jobs = {}
 analysis_jobs_lock = threading.Lock()
 
-# Apply API credentials from the local .env file (loaded above).
-# These override the hardcoded defaults so users can supply their own keys
-# without editing committed source. ANTHROPIC_* points at any Anthropic-
-# compatible endpoint (e.g. 火山方舟 Ark /api/coding); QUANTAGENT_TRIAL_API_KEY
-# overrides the built-in DeepSeek trial key.
-_env_anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
-if _env_anthropic_key:
-    analyzer.config["anthropic_api_key"] = _env_anthropic_key
-    analyzer.trading_graph.config["anthropic_api_key"] = _env_anthropic_key
-_env_anthropic_base = os.environ.get("ANTHROPIC_BASE_URL", "").strip()
-if _env_anthropic_base:
-    analyzer.config["base_url"] = _env_anthropic_base
-    analyzer.trading_graph.config["base_url"] = _env_anthropic_base
-_env_anthropic_model = os.environ.get("ANTHROPIC_MODEL", "").strip()
-if _env_anthropic_model:
-    analyzer.config["agent_llm_model"] = _env_anthropic_model
-    analyzer.config["graph_llm_model"] = _env_anthropic_model
-    analyzer.trading_graph.config["agent_llm_model"] = _env_anthropic_model
-    analyzer.trading_graph.config["graph_llm_model"] = _env_anthropic_model
-_env_trial_key = os.environ.get("QUANTAGENT_TRIAL_API_KEY", "").strip()
-if _env_trial_key:
-    analyzer.config["trial_api_key"] = _env_trial_key
-    analyzer.trading_graph.config["trial_api_key"] = _env_trial_key
+# Re-apply env credentials to the already-constructed graph's config as well, so
+# the running LLM clients see them. (They were already applied to self.config
+# before the graph was built; this keeps the graph's copy consistent and picks
+# up anything resolved later.)
+_apply_env_credentials(analyzer.config)
+_apply_env_credentials(analyzer.trading_graph.config)
 
 
 def _has_report_text(value: Any) -> bool:
