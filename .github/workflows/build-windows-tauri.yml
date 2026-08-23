@@ -87,6 +87,50 @@ jobs:
           bundled-backend/python-runtime/python.exe --version
           bundled-backend/python-runtime/python.exe -c "import sys; sys.path.insert(0, r'bundled-backend/python/site-packages'); import flask, requests; print('Bundled Python runtime OK')"
 
+      - name: Smoke-test bundled Flask backend (desktop mode)
+        working-directory: desktop/tauri
+        shell: bash
+        run: |
+          # Start the bundled backend exactly like the Tauri shell does, then verify
+          # /api/health returns desktop:true with the expected token. This catches
+          # startup crashes (e.g. missing API keys) that a compile-only build misses.
+          export QUANTAGENT_DESKTOP=1
+          export QUANTAGENT_DESKTOP_TOKEN=quantagent-desktop-backend-v2
+          export QUANTAGENT_FLASK_PORT=5099
+          export PYTHONPATH="$PWD/bundled-backend/python/site-packages;$PWD/bundled-backend/backend"
+          export PYTHONDONTWRITEBYTECODE=1
+          export PYTHONUNBUFFERED=1
+
+          bundled-backend/python-runtime/python.exe bundled-backend/backend/web_interface.py > flask-smoke.log 2>&1 &
+          FLASK_PID=$!
+          echo "Started Flask PID=$FLASK_PID"
+
+          ok=0
+          for i in $(seq 1 60); do
+            body=$(curl -s http://127.0.0.1:5099/api/health || true)
+            if echo "$body" | grep -q '"status":"ok"' \
+               && echo "$body" | grep -q '"desktop":true' \
+               && echo "$body" | grep -q '"token":"quantagent-desktop-backend-v2"'; then
+              echo "Flask health check OK: $body"
+              ok=1
+              break
+            fi
+            if ! kill -0 "$FLASK_PID" 2>/dev/null; then
+              echo "::error::Flask exited during smoke test"
+              cat flask-smoke.log
+              exit 1
+            fi
+            sleep 2
+          done
+
+          kill "$FLASK_PID" 2>/dev/null || true
+
+          if [ "$ok" -ne 1 ]; then
+            echo "::error::Flask did not become healthy in time"
+            cat flask-smoke.log
+            exit 1
+          fi
+
       - name: Build Tauri Windows app
         working-directory: desktop/tauri
         env:
