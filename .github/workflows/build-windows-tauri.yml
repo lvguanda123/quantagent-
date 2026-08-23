@@ -94,13 +94,19 @@ jobs:
           # Start the bundled backend exactly like the Tauri shell does, then verify
           # /api/health returns desktop:true with the expected token. This catches
           # startup crashes (e.g. missing API keys) that a compile-only build misses.
+          #
+          # NOTE: this runs the WINDOWS python.exe under Git Bash, so PYTHONPATH must
+          # use Windows-style paths (pwd -W), not Unix-style $PWD (/d/a/...) which
+          # the Windows interpreter cannot resolve.
+          WIN_CWD="$(pwd -W)"
           export QUANTAGENT_DESKTOP=1
           export QUANTAGENT_DESKTOP_TOKEN=quantagent-desktop-backend-v2
           export QUANTAGENT_FLASK_PORT=5099
-          export PYTHONPATH="$PWD/bundled-backend/python/site-packages;$PWD/bundled-backend/backend"
+          export PYTHONPATH="${WIN_CWD}/bundled-backend/python/site-packages;${WIN_CWD}/bundled-backend/backend"
           export PYTHONDONTWRITEBYTECODE=1
           export PYTHONUNBUFFERED=1
 
+          echo "PYTHONPATH=$PYTHONPATH"
           bundled-backend/python-runtime/python.exe bundled-backend/backend/web_interface.py > flask-smoke.log 2>&1 &
           FLASK_PID=$!
           echo "Started Flask PID=$FLASK_PID"
@@ -117,6 +123,7 @@ jobs:
             fi
             if ! kill -0 "$FLASK_PID" 2>/dev/null; then
               echo "::error::Flask exited during smoke test"
+              echo "----- flask-smoke.log -----"
               cat flask-smoke.log
               exit 1
             fi
@@ -127,6 +134,7 @@ jobs:
 
           if [ "$ok" -ne 1 ]; then
             echo "::error::Flask did not become healthy in time"
+            echo "----- flask-smoke.log -----"
             cat flask-smoke.log
             exit 1
           fi
