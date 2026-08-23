@@ -81,6 +81,41 @@ class YahooFinanceProvider(BaseDataProvider):
         self._symbols = {**YAHOO_SYMBOLS, **(symbol_map or {})}
         self._intervals = {**YAHOO_INTERVALS, **(interval_map or {})}
 
+    def _to_yahoo_symbol(self, symbol: str) -> str:
+        """Resolve an internal symbol to a Yahoo Finance ticker.
+
+        Explicit mappings in YAHOO_SYMBOLS take precedence. For any bare
+        6-digit A-share code not in the table, append the exchange suffix
+        automatically so the *whole* market works without hand-listing:
+          - 6xxxxx / 9xxxxx / 5xxxxx (Shanghai) -> .SS
+          - 0xxxxx / 3xxxxx / 2xxxxx (Shenzhen) -> .SZ
+        Index codes with an SH/SZ prefix are normalised likewise.
+        """
+        if symbol in self._symbols:
+            return self._symbols[symbol]
+
+        s = symbol.strip()
+        upper = s.upper()
+
+        # Already a Yahoo-style A-share ticker (e.g. 000001.SZ)
+        if "." in s and upper.rsplit(".", 1)[-1] in ("SS", "SZ"):
+            return upper
+
+        # Explicit prefix form, e.g. SH000001 / SZ399006
+        if upper.startswith("SH") and upper[2:].isdigit():
+            return f"{upper[2:]}.SS"
+        if upper.startswith("SZ") and upper[2:].isdigit():
+            return f"{upper[2:]}.SZ"
+
+        # Bare 6-digit A-share / ETF code -> infer exchange by leading digit
+        if s.isdigit() and len(s) == 6:
+            if s[0] in ("6", "9", "5"):
+                return f"{s}.SS"
+            return f"{s}.SZ"
+
+        # Fall back to the raw symbol (US tickers, crypto, etc.)
+        return s
+
     def _raw_fetch(self, req: FetchRequest) -> pd.DataFrame:
         """Download data from Yahoo Finance.
 
@@ -93,7 +128,7 @@ class YahooFinanceProvider(BaseDataProvider):
         Raises:
             DataFetchError: on network errors, rate limits, or empty responses
         """
-        yf_symbol = self._symbols.get(req.symbol, req.symbol)
+        yf_symbol = self._to_yahoo_symbol(req.symbol)
         yf_interval = self._intervals.get(req.interval, req.interval)
 
         logger.info(

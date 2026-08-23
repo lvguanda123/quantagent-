@@ -1369,6 +1369,138 @@
             font-weight: 850;
         }
 
+        /* History analysis modal */
+        .history-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 2600;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            background: rgba(8, 11, 20, 0.58);
+            backdrop-filter: blur(10px);
+        }
+
+        .history-modal.is-visible {
+            display: flex;
+        }
+
+        .history-card {
+            width: min(860px, 100%);
+            max-height: calc(100vh - 4rem);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            border-radius: 14px;
+            background: var(--surface-bg);
+            color: var(--text-primary);
+            box-shadow: 0 30px 90px rgba(0, 0, 0, 0.32);
+            padding: 1.75rem 2rem;
+        }
+
+        .history-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            margin-bottom: 1rem;
+        }
+
+        .history-toolbar select,
+        .history-toolbar input {
+            border: 1px solid var(--gray-300);
+            border-radius: 8px;
+            padding: 0.5rem 0.7rem;
+            background: var(--surface-muted);
+            color: var(--text-primary);
+        }
+
+        .history-toolbar .spacer { flex: 1; }
+
+        .history-list {
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            padding-right: 0.25rem;
+        }
+
+        .history-item {
+            border: 1px solid var(--gray-200);
+            border-radius: 12px;
+            padding: 1rem 1.1rem;
+            background: var(--surface-muted);
+            cursor: pointer;
+            transition: transform 0.15s ease, border-color 0.15s ease;
+        }
+
+        .history-item:hover {
+            transform: translateY(-2px);
+            border-color: var(--etrade-purple-light);
+        }
+
+        .history-item-top {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .history-asset {
+            font-size: 1.15rem;
+            font-weight: 800;
+            color: var(--text-primary);
+        }
+
+        .history-direction {
+            font-weight: 800;
+            padding: 0.2rem 0.6rem;
+            border-radius: 999px;
+            font-size: 0.85rem;
+        }
+
+        .dir-BUY, .dir-买入, .dir-看多 { background: rgba(34,197,94,0.18); color: #16a34a; }
+        .dir-SELL, .dir-卖出, .dir-看空 { background: rgba(239,68,68,0.18); color: #dc2626; }
+        .dir-HOLD, .dir-观望, .dir-中性 { background: rgba(148,163,184,0.22); color: #64748b; }
+
+        .history-meta {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-top: 0.4rem;
+        }
+
+        .history-prices {
+            margin-top: 0.35rem;
+            color: var(--text-secondary);
+            font-size: 0.88rem;
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .history-del-btn {
+            float: right;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 0.95rem;
+        }
+
+        .history-del-btn:hover { color: #dc2626; }
+
+        .history-empty-state {
+            text-align: center;
+            color: var(--text-muted);
+            padding: 3rem 1rem;
+        }
+
+        .history-count {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
         :root[data-theme="dark"] .auth-card,
         :root[data-theme="dark"] .auth-form-panel,
         :root[data-theme="dark"] .membership-card {
@@ -1600,6 +1732,7 @@
                 </button>
                 <div class="account-dropdown" role="menu">
                     <button type="button" role="menuitem" onclick="openMembershipModal()"><i class="fas fa-crown"></i> 会员</button>
+                    <button type="button" role="menuitem" onclick="openHistoryModal()"><i class="fas fa-clock-rotate-left"></i> 历史分析</button>
                     <a href="#settings-panel" role="menuitem"><i class="fas fa-sliders-h"></i> 账户设置</a>
                     <button type="button" role="menuitem" onclick="handleLogoutAction()"><i class="fas fa-sign-out-alt"></i> 退出登录</button>
                 </div>
@@ -1670,6 +1803,29 @@
             </div>
         </div>
     </div>
+
+    <!-- History analysis modal -->
+    <div class="history-modal" id="historyModal" aria-modal="true" role="dialog">
+        <div class="history-card">
+            <div class="membership-header">
+                <h2><i class="fas fa-clock-rotate-left"></i> 历史分析</h2>
+                <button class="modal-close-btn" type="button" onclick="closeHistoryModal()"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="history-toolbar">
+                <select id="historyAssetFilter" onchange="renderHistoryList()">
+                    <option value="">全部股票</option>
+                </select>
+                <input type="text" id="historyKeyword" placeholder="搜索股票名称/代码" oninput="renderHistoryList()">
+                <span class="spacer"></span>
+                <button class="history-clear" type="button" onclick="exportHistory()"><i class="fas fa-download"></i> 导出</button>
+                <button class="history-clear" type="button" onclick="clearHistory()"><i class="fas fa-trash"></i> 清空</button>
+            </div>
+            <div class="history-list" id="historyList">
+                <div class="history-empty-state">加载中...</div>
+            </div>
+        </div>
+    </div>
+
     <!-- Page wrapper -->
     <div class="flex flex-col min-h-screen overflow-hidden">
 
@@ -1752,34 +1908,22 @@
                                         <i class="fas fa-coins"></i> 资产
                                     </label>
                                     <div class="asset-button-grid" id="assetButtonGrid">
-                                        <!-- 中国A股 -->
-                                        <button type="button" class="asset-btn" data-asset="000001" onclick="selectAsset(this, '000001')">
-                                            <i class="fas fa-landmark"></i> 000001
-                                        </button>
-                                        <button type="button" class="asset-btn" data-asset="600519" onclick="selectAsset(this, '600519')">
-                                            <i class="fas fa-landmark"></i> 600519
-                                        </button>
-                                        <button type="button" class="asset-btn" data-asset="601318" onclick="selectAsset(this, '601318')">
-                                            <i class="fas fa-landmark"></i> 601318
-                                        </button>
-                                        <button type="button" class="asset-btn" data-asset="300750" onclick="selectAsset(this, '300750')">
-                                            <i class="fas fa-landmark"></i> 300750
-                                        </button>
-                                        <!-- 中国指数 -->
+                                        <!-- 四大板块指数：可直接点选 -->
                                         <button type="button" class="asset-btn" data-asset="SH000001" onclick="selectAsset(this, 'SH000001')">
-                                            <i class="fas fa-chart-area"></i> 上证指数
+                                            <i class="fas fa-chart-line"></i> 上证指数
                                         </button>
                                         <button type="button" class="asset-btn" data-asset="SZ399001" onclick="selectAsset(this, 'SZ399001')">
-                                            <i class="fas fa-chart-area"></i> 深证成指
+                                            <i class="fas fa-chart-line"></i> 深证成指
                                         </button>
                                         <button type="button" class="asset-btn" data-asset="SZ399006" onclick="selectAsset(this, 'SZ399006')">
-                                            <i class="fas fa-chart-area"></i> 创业板指
+                                            <i class="fas fa-chart-line"></i> 创业板指
                                         </button>
-                                        <button type="button" class="asset-btn" data-asset="SH000300" onclick="selectAsset(this, 'SH000300')">
-                                            <i class="fas fa-chart-area"></i> 沪深300
+                                        <button type="button" class="asset-btn" data-asset="SH000688" onclick="selectAsset(this, 'SH000688')">
+                                            <i class="fas fa-chart-line"></i> 科创50
                                         </button>
+                                        <!-- 其他个股/资产：自定义输入，选择后会记录到下方“最近查看” -->
                                         <button type="button" class="asset-btn custom-asset-btn" id="customAssetBtn" onclick="showCustomAssetInput()">
-                                            <i class="fas fa-plus"></i> 自定义
+                                            <i class="fas fa-plus"></i> 自定义个股
                                         </button>
                                     </div>
 
@@ -2179,6 +2323,165 @@
             document.getElementById('membershipModal')?.classList.remove('is-visible');
         }
 
+        // ---------- Analysis history (local per-phone SQLite) ----------
+        function getCurrentPhone() {
+            return localStorage.getItem('quantagent_phone') || '';
+        }
+
+        function openHistoryModal() {
+            document.getElementById('accountMenu')?.classList.remove('is-open');
+            const phone = getCurrentPhone();
+            if (!phone) {
+                alert('请先登录后再查看历史分析。');
+                return;
+            }
+            document.getElementById('historyModal')?.classList.add('is-visible');
+            loadHistoryAssets();
+            loadHistoryList();
+        }
+
+        function closeHistoryModal() {
+            document.getElementById('historyModal')?.classList.remove('is-visible');
+        }
+
+        let historyCache = [];
+
+        function loadHistoryAssets() {
+            const phone = getCurrentPhone();
+            fetch(`/api/history/assets?phone=${encodeURIComponent(phone)}`)
+                .then(r => r.json())
+                .then(data => {
+                    const sel = document.getElementById('historyAssetFilter');
+                    if (!sel) return;
+                    const current = sel.value;
+                    const assets = data.assets || [];
+                    sel.innerHTML = '<option value="">全部股票</option>'
+                        + assets.map(a => `<option value="${escapeHtml(a.asset || '')}">${escapeHtml(a.asset_name || a.asset || '')}（${a.times}）</option>`).join('');
+                    sel.value = current;
+                })
+                .catch(err => console.warn('load history assets failed', err));
+        }
+
+        function loadHistoryList() {
+            const phone = getCurrentPhone();
+            const listEl = document.getElementById('historyList');
+            if (listEl) listEl.innerHTML = '<div class="history-empty-state">加载中...</div>';
+            fetch(`/api/history?phone=${encodeURIComponent(phone)}&limit=200`)
+                .then(r => r.json())
+                .then(data => {
+                    historyCache = data.records || [];
+                    renderHistoryList();
+                })
+                .catch(err => {
+                    if (listEl) listEl.innerHTML = `<div class="history-empty-state">加载失败：${escapeHtml(err.message)}</div>`;
+                });
+        }
+
+        function renderHistoryList() {
+            const listEl = document.getElementById('historyList');
+            if (!listEl) return;
+            const assetFilter = (document.getElementById('historyAssetFilter')?.value || '').trim().toLowerCase();
+            const keyword = (document.getElementById('historyKeyword')?.value || '').trim().toLowerCase();
+
+            let records = historyCache;
+            if (assetFilter) records = records.filter(r => (r.asset || '').toLowerCase() === assetFilter);
+            if (keyword) records = records.filter(r =>
+                (r.asset_name || '').toLowerCase().includes(keyword) ||
+                (r.asset || '').toLowerCase().includes(keyword));
+
+            if (!records.length) {
+                listEl.innerHTML = '<div class="history-empty-state">暂无历史分析记录。每次分析完成后会自动保存在本机。</div>';
+                return;
+            }
+
+            listEl.innerHTML = records.map(r => {
+                const dir = r.decision_direction || '';
+                const dirClass = 'dir-' + (dir || '').replace(/\s+/g, '');
+                const prices = [
+                    r.entry_price ? `入场 ${escapeHtml(r.entry_price)}` : '',
+                    r.stop_loss ? `止损 ${escapeHtml(r.stop_loss)}` : '',
+                    r.take_profit ? `止盈 ${escapeHtml(r.take_profit)}` : ''
+                ].filter(Boolean).join('　');
+                return `
+                <div class="history-item" onclick="openHistoryDetail(${r.id})">
+                    <button class="history-del-btn" title="删除" onclick="event.stopPropagation();deleteHistory(${r.id})"><i class="fas fa-trash"></i></button>
+                    <div class="history-item-top">
+                        <span class="history-asset">${escapeHtml(r.asset_name || r.asset || '未知资产')}</span>
+                        ${dir ? `<span class="history-direction ${dirClass}">${escapeHtml(dir)}</span>` : ''}
+                        <span class="history-meta">${escapeHtml(r.timeframe || '')}</span>
+                    </div>
+                    <div class="history-meta">${escapeHtml(r.created_at || '')}　·　${escapeHtml(r.start_date || '')} ~ ${escapeHtml(r.end_date || '')}　·　${escapeHtml(r.data_source || '')}</div>
+                    ${prices ? `<div class="history-prices">${prices}</div>` : ''}
+                </div>`;
+            }).join('');
+        }
+
+        function openHistoryDetail(id) {
+            const phone = getCurrentPhone();
+            fetch(`/api/history/${id}?phone=${encodeURIComponent(phone)}`)
+                .then(r => {
+                    if (!r.ok) throw new Error('记录不存在或无权查看');
+                    return r.json();
+                })
+                .then(data => {
+                    const report = data.report || {};
+                    // Reuse the existing output page rendering pipeline.
+                    sessionStorage.setItem('analysisResults', JSON.stringify(report));
+                    localStorage.setItem('quantagent_last_analysis_results', JSON.stringify(report));
+                    closeHistoryModal();
+                    window.location.href = '/output';
+                })
+                .catch(err => alert('打开记录失败：' + err.message));
+        }
+
+        function deleteHistory(id) {
+            if (!confirm('确定删除这条历史分析记录吗？')) return;
+            const phone = getCurrentPhone();
+            fetch(`/api/history/${id}?phone=${encodeURIComponent(phone)}`, { method: 'DELETE' })
+                .then(r => r.json())
+                .then(() => {
+                    loadHistoryAssets();
+                    loadHistoryList();
+                })
+                .catch(err => alert('删除失败：' + err.message));
+        }
+
+        function clearHistory() {
+            if (!confirm('确定清空当前账号的全部历史分析记录吗？此操作不可撤销。')) return;
+            const phone = getCurrentPhone();
+            fetch(`/api/history?phone=${encodeURIComponent(phone)}`, { method: 'DELETE' })
+                .then(r => r.json())
+                .then(() => {
+                    loadHistoryAssets();
+                    loadHistoryList();
+                })
+                .catch(err => alert('清空失败：' + err.message));
+        }
+
+        function exportHistory() {
+            const phone = getCurrentPhone();
+            fetch(`/api/history/export?phone=${encodeURIComponent(phone)}`)
+                .then(r => r.json())
+                .then(data => {
+                    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `quantagent_history_${phone}_${new Date().toISOString().slice(0,10)}.json`;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    URL.revokeObjectURL(url);
+                })
+                .catch(err => alert('导出失败：' + err.message));
+        }
+
+        function escapeHtml(str) {
+            return String(str ?? '')
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
         function applyQuantAgentTheme(theme) {
             document.documentElement.setAttribute('data-theme', theme);
             localStorage.setItem('quantagent_theme', theme);
@@ -2250,8 +2553,33 @@
             SELECTED_ASSET: 'quantagent_selected_asset',
             SELECTED_TIMEFRAME: 'quantagent_selected_timeframe',
             SELECTED_DATA_SOURCE: 'quantagent_selected_data_source',
-            ASSET_HISTORY: 'quantagent_asset_history'
+            ASSET_HISTORY: 'quantagent_asset_history',
+            ASSET_NAMES: 'quantagent_asset_names'
         };
+
+        // 记住“代码 -> 名称”映射，用于“最近查看”里展示更友好的标签
+        function rememberAssetName(symbol, name) {
+            if (!symbol || !name) return;
+            try {
+                const raw = localStorage.getItem(STORAGE_KEYS.ASSET_NAMES);
+                const map = raw ? JSON.parse(raw) : {};
+                map[symbol] = name;
+                localStorage.setItem(STORAGE_KEYS.ASSET_NAMES, JSON.stringify(map));
+            } catch (e) {
+                console.warn('Could not remember asset name', e);
+            }
+        }
+
+        function getAssetName(symbol) {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEYS.ASSET_NAMES);
+                if (raw) {
+                    const map = JSON.parse(raw);
+                    if (map[symbol]) return map[symbol];
+                }
+            } catch (e) { /* ignore */ }
+            return '';
+        }
 
         function focusModelProvider(event) {
             event.preventDefault();
@@ -2369,9 +2697,17 @@
         }
 
         function getAssetLabel(symbol) {
+            // 1) 已知名称（分析后回填） -> “名称 (代码)”
+            const knownName = getAssetName(symbol);
+            if (knownName) return `${knownName} (${symbol})`;
+            // 2) 网格内按钮（四大指数 / 已添加的自定义按钮）
             const btn = Array.from(document.querySelectorAll('.asset-btn')).find(item => item.dataset.asset === symbol);
-            if (!btn) return symbol;
-            return btn.textContent.replace(/\s+/g, ' ').trim();
+            if (btn) {
+                const text = btn.textContent.replace(/\s+/g, ' ').trim();
+                // 指数按钮本身已是中文名，直接返回
+                return text || symbol;
+            }
+            return symbol;
         }
 
         function renderAssetHistory() {
@@ -2419,15 +2755,10 @@
         }
 
         function selectAssetFromHistory(symbol) {
-            let btn = Array.from(document.querySelectorAll('.asset-btn')).find(item => item.dataset.asset === symbol);
-            if (!btn) {
-                addCustomAssetButton(symbol, false);
-                btn = Array.from(document.querySelectorAll('.asset-btn')).find(item => item.dataset.asset === symbol);
-            }
-            if (btn) {
-                selectAsset(btn, symbol);
-                btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
+            // 指数在网格里有对应按钮则高亮；个股没有常驻按钮，直接选中（button 传 null）
+            const btn = Array.from(document.querySelectorAll('.asset-btn')).find(item => item.dataset.asset === symbol);
+            selectAsset(btn || null, symbol);
+            if (btn) btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
 
         function clearAssetHistory() {
@@ -2437,24 +2768,13 @@
 
         // Load custom assets from localStorage and server, render them
         function loadCustomAssets() {
-            // Load from localStorage first (fast)
-            try {
-                const local = localStorage.getItem(STORAGE_KEYS.CUSTOM_ASSETS);
-                if (local) {
-                    const list = JSON.parse(local);
-                    list.forEach(sym => addCustomAssetButton(sym, false));
-                }
-            } catch (e) {
-                console.warn('Failed to parse local custom assets', e);
-            }
-
-            // Then attempt to load server-persisted custom assets and merge
+            // 设计调整：个股不再作为常驻按钮渲染进主网格，主网格只保留四大板块指数。
+            // 已选/已分析过的个股通过下方“最近查看”进行回访。
+            // 仍把服务器端保存的自定义代码同步到本地，仅用于记录，不渲染按钮。
             fetch('/api/custom-assets')
                 .then(r => r.json())
                 .then(data => {
                     if (Array.isArray(data.custom_assets)) {
-                        data.custom_assets.forEach(sym => addCustomAssetButton(sym, true));
-                        // Sync server list into localStorage (merge, dedupe)
                         try {
                             const local = JSON.parse(localStorage.getItem(STORAGE_KEYS.CUSTOM_ASSETS) || '[]');
                             const merged = Array.from(new Set([...(local || []), ...data.custom_assets]));
@@ -2509,14 +2829,8 @@
                   console.warn('Error saving custom asset to server', err);
               });
 
-            // Add button and select it
-            addCustomAssetButton(symbol);
-            // Select the new asset: find button and click
-            const grid = document.getElementById('assetButtonGrid');
-            const newBtn = Array.from(grid.querySelectorAll('.asset-btn')).find(b => b.dataset.asset === symbol);
-            if (newBtn) {
-                newBtn.click();
-            }
+            // 个股不常驻主网格：直接选中并记录到“最近查看”即可
+            selectAsset(null, symbol);
 
             // Hide custom asset input
             document.getElementById('customAssetDiv').style.display = 'none';
@@ -2525,8 +2839,7 @@
             customAssetEl.value = '';
 
             // Notify user
-            // Use a non-blocking notification (replace alert with console + subtle DOM message if desired)
-            console.log(`Custom asset "${symbol}" selected and persisted`);
+            console.log(`Custom asset "${symbol}" selected`);
         }
 
         // Updated selectAsset to persist selection to localStorage
@@ -2536,8 +2849,15 @@
                 btn.classList.remove('active');
             });
 
-            // Add active class to clicked button
-            button.classList.add('active');
+            // Add active class to the button for the chosen asset (individual stocks
+            // selected via “自定义” have no grid button, so button may be null).
+            if (button) {
+                button.classList.add('active');
+            } else {
+                const match = Array.from(document.querySelectorAll('.asset-btn'))
+                    .find(b => b.dataset.asset === asset);
+                if (match) match.classList.add('active');
+            }
 
             // Store selected asset
             selectedAsset = asset;
@@ -2693,22 +3013,13 @@
                 console.error('Error restoring data source selection:', e);
             }
 
-            // Restore selected asset (if saved). If it is a custom asset that hasn't been added yet,
-            // add it and then select it (addCustomAssetButton handles checking duplicates).
+            // Restore selected asset (if saved). Individual stocks no longer have a
+            // persistent grid button — just restore the selection; indices highlight
+            // their existing grid button via selectAsset(null, asset).
             try {
                 const savedAsset = localStorage.getItem(STORAGE_KEYS.SELECTED_ASSET);
                 if (savedAsset) {
-                    // Try to find an existing button
-                    let btn = Array.from(document.querySelectorAll('.asset-btn')).find(b => b.dataset.asset === savedAsset);
-                    if (!btn) {
-                        // Add it as custom and then select
-                        addCustomAssetButton(savedAsset, false);
-                        btn = Array.from(document.querySelectorAll('.asset-btn')).find(b => b.dataset.asset === savedAsset);
-                    }
-                    if (btn) {
-                        btn.classList.add('active');
-                        selectedAsset = savedAsset;
-                    }
+                    selectAsset(null, savedAsset);
                 } else {
                     // fallback defaults from original code
                     const defaultTimeframeBtn = document.querySelector('[data-timeframe="1h"]');
@@ -2897,10 +3208,18 @@
              document.querySelectorAll('.asset-btn').forEach(btn => {
                  btn.classList.remove('active');
              });
-             
-             // Add active class to clicked button
-             button.classList.add('active');
-             
+
+             // Add active class to the chosen button. Individual stocks entered via
+             // “自定义个股” have no grid button, so button may be null — fall back to
+             // matching by data-asset so an index button still highlights correctly.
+             if (button) {
+                 button.classList.add('active');
+             } else {
+                 const match = Array.from(document.querySelectorAll('.asset-btn'))
+                     .find(b => b.dataset.asset === asset);
+                 if (match) match.classList.add('active');
+             }
+
              // Store selected asset
              selectedAsset = asset;
              try {
@@ -2969,14 +3288,8 @@
                    console.warn('Error saving custom asset to server', err);
                });
 
-            // Add button and select it
-            addCustomAssetButton(symbol);
-            // Select the new asset: find button and click
-            const grid = document.getElementById('assetButtonGrid');
-            const newBtn = Array.from(grid.querySelectorAll('.asset-btn')).find(b => b.dataset.asset === symbol);
-            if (newBtn) {
-                newBtn.click();
-            }
+            // 个股不常驻主网格：直接选中并记录到“最近查看”
+            selectAsset(null, symbol);
 
             // Hide custom asset input
             document.getElementById('customAssetDiv').style.display = 'none';
@@ -2984,9 +3297,7 @@
             // Clear input
             customAssetEl.value = '';
 
-            // Notify user
-            // Use a non-blocking notification (replace alert with console + subtle DOM message if desired)
-            console.log(`Custom asset "${symbol}" selected and persisted`);
+            console.log(`Custom asset "${symbol}" selected`);
          }
         
                  function runAnalysis() {
@@ -3033,7 +3344,8 @@
                  end_date: endDate,
                  end_time: endTime,
                  use_current_time: useCurrentTime,
-                 redirect_to_output: true
+                 redirect_to_output: true,
+                 phone: getCurrentPhone()
              };
              
              // Make API call
@@ -3091,7 +3403,13 @@
                     const serializedResults = JSON.stringify(data.full_results);
                     sessionStorage.setItem('analysisResults', serializedResults);
                     localStorage.setItem(ANALYSIS_CACHE_KEY, serializedResults);
-                    saveAssetHistory(data.full_results.asset_name || selectedAsset);
+                    // 始终以“代码”作为历史 key，并记录名称用于展示
+                    const code = selectedAsset || data.full_results.asset || '';
+                    const name = data.full_results.asset_name || '';
+                    if (code) {
+                        rememberAssetName(code, name);
+                        saveAssetHistory(code);
+                    }
                     updateReturnReportButton();
                 }
                 stopAnalysisLoading(true);

@@ -25,6 +25,7 @@ app/
 
 # Virtual environments
 venv/
+.venv/
 envs/
 python311.exe
 

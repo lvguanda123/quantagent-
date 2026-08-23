@@ -17,7 +17,40 @@ from typing import Any, Dict
 import pandas as pd
 from flask import Flask, jsonify, render_template, request, send_from_directory
 
+_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+if _BASE_DIR.startswith("\\\\?\\"):
+    _BASE_DIR = _BASE_DIR[4:]
+
+
+def _load_dotenv(path: str = ".env") -> None:
+    """Load KEY=VALUE pairs from a local .env file into os.environ.
+
+    Lightweight, dependency-free loader so that local API keys can be kept
+    out of source control (.env is git-ignored). Existing environment
+    variables take precedence over values in the file.
+    """
+    env_path = os.path.join(_BASE_DIR, path)
+    if not os.path.exists(env_path):
+        return
+    try:
+        with open(env_path, "r", encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, _, value = line.partition("=")
+                key = key.strip()
+                value = value.strip().strip('"').strip("'")
+                if key and key not in os.environ:
+                    os.environ[key] = value
+    except OSError as error:
+        print(f"Warning: could not read .env: {error}")
+
+
+_load_dotenv()
+
 import static_util
+import history_store
 from trading_graph import TradingGraph
 
 try:
@@ -39,9 +72,6 @@ except ImportError as error:
     AKSHARE_AVAILABLE = False
     print(f"Warning: AKShare not available: {error}")
 
-_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-if _BASE_DIR.startswith("\\\\?\\"):
-    _BASE_DIR = _BASE_DIR[4:]
 
 app = Flask(
     __name__,
@@ -50,6 +80,12 @@ app = Flask(
     static_folder=os.path.join(_BASE_DIR, "static"),
     static_url_path="/static",
 )
+
+# Initialise the local per-user analysis history database (SQLite).
+try:
+    history_store.init_db()
+except Exception as error:  # noqa: BLE001 - history is non-critical to startup
+    print(f"Warning: could not initialise history database: {error}")
 
 
 def normalize_custom_base_url(base_url: str) -> str:
@@ -139,49 +175,98 @@ class WebTradingAnalyzer:
             message = response.text
         raise ValueError(f"搜狐接口验证失败（HTTP {response.status_code}）：{message or '未知错误'}")
 
+    @staticmethod
+    def _sina_tx_symbol(symbol: str) -> str:
+        """Map a bare 6-digit A-share code to the Sina/Tencent sh/sz form."""
+        s = symbol.strip().lower().replace("sh", "").replace("sz", "")
+        if not s.isdigit() or len(s) != 6:
+            return symbol
+        # 6/9/5 -> Shanghai, otherwise Shenzhen
+        return ("sh" if s[0] in ("6", "9", "5") else "sz") + s
+
+    def _standardize_ohlcv(self, df: pd.DataFrame, source: str) -> pd.DataFrame:
+        """Normalize different source column names to the Datetime/OHLCV schema."""
+        if df is None or df.empty:
+            return pd.DataFrame()
+
+        rename_map = {
+            # 东方财富: 日期/开盘/最高/最低/收盘/成交量
+            "日期": "Datetime", "开盘": "Open", "最高": "High",
+            "最低": "Low", "收盘": "Close", "成交量": "Volume",
+            # 新浪/腾讯: date/open/high/low/close/volume
+            "date": "Datetime", "open": "Open", "high": "High",
+            "low": "Low", "close": "Close", "volume": "Volume",
+        }
+        df = df.rename(columns=rename_map)
+        # Some sources return "date" as the index name after reset_index
+        if "Datetime" not in df.columns:
+            if isinstance(df.index, pd.DatetimeIndex) or "date" in str(df.index.name).lower():
+                df = df.reset_index().rename(columns=rename_map)
+
+        required = ["Datetime", "Open", "High", "Low", "Close", "Volume"]
+        if not all(c in df.columns for c in required):
+            print(f"[{source}] missing columns, got: {df.columns.tolist()}")
+            return pd.DataFrame()
+
+        df["Datetime"] = pd.to_datetime(df["Datetime"])
+        df = df[required].copy()
+        for col in ["Open", "High", "Low", "Close", "Volume"]:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+        return df.dropna(subset=["Open", "High", "Low", "Close"])
+
     def fetch_akshare_stock_data(
         self, symbol: str, start_date: str, end_date: str
     ) -> pd.DataFrame:
-        """Fetch A-share stock daily data via stock_zh_a_hist (东方财富)."""
+        """Fetch A-share daily OHLCV with three sources as fallbacks.
+
+        Order: 东方财富 (stock_zh_a_hist) -> 新浪 (stock_zh_a_daily)
+        -> 腾讯 (stock_zh_a_hist_tx). Each source is retried once on transient
+        network errors before moving on, so a single provider being down or
+        rate-limited does not block the whole market. Minute-level data is
+        handled separately and is unaffected.
+        """
         if not AKSHARE_AVAILABLE:
             return pd.DataFrame()
 
-        try:
-            # stock_zh_a_hist uses pure 6-digit code
-            clean_symbol = symbol.replace("sz", "").replace("SZ", "").replace("sh", "").replace("SH", "")
+        clean = symbol.replace("sz", "").replace("SZ", "").replace("sh", "").replace("SH", "")
+        st = start_date.replace("-", "")
+        et = end_date.replace("-", "")
+        sina_tx = self._sina_tx_symbol(symbol)
 
-            df = ak.stock_zh_a_hist(
-                symbol=clean_symbol,
-                period="daily",
-                start_date=start_date.replace("-", ""),
-                end_date=end_date.replace("-", ""),
-                adjust="qfq"
-            )
+        def eastmoney():
+            return ak.stock_zh_a_hist(
+                symbol=clean, period="daily", start_date=st, end_date=et, adjust="qfq")
 
-            if df is None or df.empty:
-                return pd.DataFrame()
+        def sina():
+            return ak.stock_zh_a_daily(
+                symbol=sina_tx, start_date=st, end_date=et, adjust="qfq")
 
-            # Standardize columns
-            df = df.rename(columns={
-                "日期": "Datetime",
-                "开盘": "Open",
-                "最高": "High",
-                "最低": "Low",
-                "收盘": "Close",
-                "成交量": "Volume"
-            })
+        def tencent():
+            return ak.stock_zh_a_hist_tx(
+                symbol=sina_tx, start_date=st, end_date=et, adjust="qfq", timeout=15)
 
-            required = ["Datetime", "Open", "High", "Low", "Close", "Volume"]
-            if not all(c in df.columns for c in required):
-                print(f"Missing columns: {df.columns.tolist()}")
-                return pd.DataFrame()
+        sources = [("eastmoney", eastmoney), ("sina", sina), ("tencent", tencent)]
+        errors = []
+        for name, fn in sources:
+            for attempt in range(2):
+                try:
+                    raw = fn()
+                    df = self._standardize_ohlcv(raw, name)
+                    if not df.empty:
+                        if name != "eastmoney":
+                            print(f"Using daily source fallback: {name} for {symbol}")
+                        return df
+                    errors.append(f"{name}: empty")
+                    break  # empty is not a network error, try next source
+                except Exception as e:  # noqa: BLE001
+                    errors.append(f"{name}: {e}")
+                    print(f"[{name}] A-share daily fetch failed (try {attempt + 1}/2): {e}")
+                    if attempt == 0:
+                        import time
+                        time.sleep(1.2)
 
-            df["Datetime"] = pd.to_datetime(df["Datetime"])
-            return df[required]
-
-        except Exception as e:
-            print(f"Error fetching A-share stock: {e}")
-            return pd.DataFrame()
+        print(f"All daily sources failed for {symbol}: {' | '.join(errors)}")
+        return pd.DataFrame()
 
     def fetch_akshare_fund_data(
         self, symbol: str, start_date: str, end_date: str
@@ -665,6 +750,30 @@ analyzer = WebTradingAnalyzer()
 analysis_jobs = {}
 analysis_jobs_lock = threading.Lock()
 
+# Apply API credentials from the local .env file (loaded above).
+# These override the hardcoded defaults so users can supply their own keys
+# without editing committed source. ANTHROPIC_* points at any Anthropic-
+# compatible endpoint (e.g. 火山方舟 Ark /api/coding); QUANTAGENT_TRIAL_API_KEY
+# overrides the built-in DeepSeek trial key.
+_env_anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+if _env_anthropic_key:
+    analyzer.config["anthropic_api_key"] = _env_anthropic_key
+    analyzer.trading_graph.config["anthropic_api_key"] = _env_anthropic_key
+_env_anthropic_base = os.environ.get("ANTHROPIC_BASE_URL", "").strip()
+if _env_anthropic_base:
+    analyzer.config["base_url"] = _env_anthropic_base
+    analyzer.trading_graph.config["base_url"] = _env_anthropic_base
+_env_anthropic_model = os.environ.get("ANTHROPIC_MODEL", "").strip()
+if _env_anthropic_model:
+    analyzer.config["agent_llm_model"] = _env_anthropic_model
+    analyzer.config["graph_llm_model"] = _env_anthropic_model
+    analyzer.trading_graph.config["agent_llm_model"] = _env_anthropic_model
+    analyzer.trading_graph.config["graph_llm_model"] = _env_anthropic_model
+_env_trial_key = os.environ.get("QUANTAGENT_TRIAL_API_KEY", "").strip()
+if _env_trial_key:
+    analyzer.config["trial_api_key"] = _env_trial_key
+    analyzer.trading_graph.config["trial_api_key"] = _env_trial_key
+
 
 def _has_report_text(value: Any) -> bool:
     if not isinstance(value, str):
@@ -763,6 +872,8 @@ def analyze():
         end_time = data.get("end_time", "23:59")
         data_source = data.get("data_source", "akshare")
 
+        phone = (data.get("phone") or "").strip()
+
         if not all([asset, start_date, end_date]):
             return jsonify({"error": "Missing: asset, start_date, end_date"})
 
@@ -860,6 +971,19 @@ def analyze():
             "pattern_chart": results.get("pattern_image", ""),
             "trend_chart": results.get("trend_image", ""),
         }
+
+        # Persist to the user's local analysis history (best-effort).
+        if phone:
+            try:
+                history_store.save_record(
+                    phone,
+                    full_response,
+                    start_date=start_date,
+                    end_date=end_date,
+                    data_source=data_source,
+                )
+            except Exception as history_error:  # noqa: BLE001
+                print(f"Warning: could not save analysis history: {history_error}")
 
         # Return as both response and full_results for redirect handling
         return jsonify({
@@ -1040,6 +1164,81 @@ def save_custom_asset():
     except Exception as e:
         print(f"Error saving custom asset: {e}")
         return jsonify({"success": False, "error": str(e)})
+
+
+def _request_phone() -> str:
+    """Pull the phone identifier from JSON body or query string."""
+    payload = request.get_json(silent=True) or {}
+    phone = payload.get("phone") or request.args.get("phone") or ""
+    return str(phone).strip()
+
+
+@app.route("/api/history", methods=["GET"])
+def get_history():
+    """List analysis history summaries for the current phone."""
+    phone = _request_phone()
+    if not phone:
+        return jsonify({"error": "未识别到登录用户", "records": []}), 400
+    asset = request.args.get("asset") or None
+    try:
+        limit = int(request.args.get("limit", "200"))
+    except ValueError:
+        limit = 200
+    records = history_store.list_records(phone, asset=asset, limit=limit)
+    return jsonify({"records": records})
+
+
+@app.route("/api/history/assets", methods=["GET"])
+def get_history_assets():
+    """List distinct assets the current phone has analysed, for filtering."""
+    phone = _request_phone()
+    if not phone:
+        return jsonify({"error": "未识别到登录用户", "assets": []}), 400
+    return jsonify({"assets": history_store.list_asset_buttons(phone)})
+
+
+@app.route("/api/history/<int:record_id>", methods=["GET"])
+def get_history_detail(record_id: int):
+    """Return one full analysis record for the current phone."""
+    phone = _request_phone()
+    if not phone:
+        return jsonify({"error": "未识别到登录用户"}), 400
+    record = history_store.get_record(phone, record_id)
+    if record is None:
+        return jsonify({"error": "记录不存在或无权查看"}), 404
+    return jsonify(record)
+
+
+@app.route("/api/history/<int:record_id>", methods=["DELETE"])
+def delete_history(record_id: int):
+    """Delete one analysis record for the current phone."""
+    phone = _request_phone()
+    if not phone:
+        return jsonify({"error": "未识别到登录用户"}), 400
+    removed = history_store.delete_record(phone, record_id)
+    if not removed:
+        return jsonify({"error": "记录不存在或无权删除"}), 404
+    return jsonify({"success": True})
+
+
+@app.route("/api/history", methods=["DELETE"])
+def clear_history():
+    """Clear all analysis history for the current phone."""
+    phone = _request_phone()
+    if not phone:
+        return jsonify({"error": "未识别到登录用户"}), 400
+    removed = history_store.clear_records(phone)
+    return jsonify({"success": True, "removed": removed})
+
+
+@app.route("/api/history/export", methods=["GET"])
+def export_history():
+    """Export all history for the current phone as JSON."""
+    phone = _request_phone()
+    if not phone:
+        return jsonify({"error": "未识别到登录用户"}), 400
+    records = history_store.export_records(phone)
+    return jsonify({"phone": phone, "exported_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "records": records})
 
 
 @app.route("/api/update-provider", methods=["POST"])
