@@ -47,7 +47,17 @@ def _load_dotenv(path: str = ".env") -> None:
         print(f"Warning: could not read .env: {error}")
 
 
+# Load the local, git-ignored .env first (development). Then import the build-time
+# generated _builtin_keys module which provides baked-in keys for the desktop app
+# via os.environ.setdefault. It is created by the packaging step from GitHub Secrets
+# and is NOT committed to git. Using a .py file (instead of a .env dotfile) ensures
+# it is always included by the Tauri/NSIS bundler, which has been observed to drop
+# dotfiles from the installed resources.
 _load_dotenv()
+try:
+    import _builtin_keys  # type: ignore  # noqa: F401
+except ImportError:
+    pass
 
 import static_util
 import history_store

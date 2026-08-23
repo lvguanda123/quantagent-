@@ -45,7 +45,7 @@ Thumbs.db
 # Environment secrets
 .env
 .env.local
-cat >> .gitignore <<'EOF'
+_builtin_keys.py
 
 # release artifacts
 *.zip
