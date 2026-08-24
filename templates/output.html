@@ -140,7 +140,7 @@
           
                   .panel-group-2 {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
             gap: 2rem;
             margin-bottom: 2rem;
             align-items: start;
@@ -168,6 +168,11 @@
              padding: 1.5rem;
              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
              transition: all 0.3s ease;
+             min-width: 0;
+         }
+
+         .analysis-text-panel {
+             overflow-x: auto;
          }
          
          .panel:hover {
@@ -279,6 +284,17 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             line-height: 1.8;
             color: var(--gray-700);
+            overflow-wrap: break-word;
+            word-wrap: break-word;
+            word-break: break-word;
+        }
+
+        /* 分析报告中不显示删除线——AI 可能自发使用 ~~text~~ 语法，
+           但在正式交易分析报告中删除线容易引起误解，统一去除。 */
+        .auto-beautify del,
+        .auto-beautify s,
+        .auto-beautify strike {
+            text-decoration: none;
         }
 
         .auto-beautify h1, .auto-beautify h2, .auto-beautify h3, .auto-beautify h4, .auto-beautify h5, .auto-beautify h6 {
