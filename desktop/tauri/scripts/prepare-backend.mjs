@@ -94,7 +94,7 @@ function writeBuiltinKeys(targetDir) {
   // Defaults keep the generated module valid for local builds without secrets.
   const arkKey = process.env.ARK_API_KEY || "";
   const arkBase = process.env.ARK_BASE_URL || "https://ark.cn-beijing.volces.com/api/coding";
-  const arkModel = process.env.ARK_MODEL || "ark-code-latest";
+  const arkModel = process.env.ARK_MODEL || "MiniMax-M3";
   const deepseekKey = process.env.DEEPSEEK_API_KEY || "";
 
   const py = [

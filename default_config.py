@@ -1,6 +1,6 @@
 DEFAULT_CONFIG = {
-    "agent_llm_model": "ark-code-latest",
-    "graph_llm_model": "ark-code-latest",
+    "agent_llm_model": "MiniMax-M3",
+    "graph_llm_model": "MiniMax-M3",
     "agent_llm_provider": "anthropic",
     "graph_llm_provider": "anthropic",
     "agent_llm_temperature": 0.1,

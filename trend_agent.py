@@ -31,14 +31,22 @@ def _model_name(llm) -> str:
 
 def _should_use_text_analysis(llm) -> bool:
     provider_kind = (getattr(llm, "metadata", {}) or {}).get("quantagent_provider")
-    if provider_kind in ("sohu", "custom_http", "custom_anthropic", "trial"):
-        return True
 
     model = _model_name(llm)
-    vision_markers = ("vision", "vl", "gpt-4o", "gpt-4.1", "claude-3")
+    # Only models whose name EXPLICITLY signals vision support use image analysis.
+    # Everything else falls back to OHLC text analysis — this avoids hanging on
+    # endpoints that don't actually support image input (e.g. MiniMax-M3, ark-code-latest).
+    vision_markers = (
+        "vision",
+        "-vl",
+        "gpt-4o",
+        "gpt-4.1",
+        "claude-3",
+    )
     if any(marker in model for marker in vision_markers):
         return False
-    return any(marker in model for marker in ("deepseek", "reasoner", "chat", "mini"))
+
+    return True
 
 
 def _is_image_unsupported_error(error: Exception) -> bool:
