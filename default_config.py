@@ -16,7 +16,7 @@ DEFAULT_CONFIG = {
     "sohu_api_key": "",
     "trial_api_key": "",
     "trial_base_url": "https://api.deepseek.com",
-    "trial_model": "deepseek-chat",
+    "trial_model": "deepseek-v4-flash-vision-exp",
     "custom_api_key": "",
     "custom_mode": "openai",
     "custom_base_url": "",

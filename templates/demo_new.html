@@ -2074,20 +2074,16 @@
                                 
                                 <!-- LLM Provider Selection -->
                                 <div class="form-group">
-                                    <label class="form-label">AI 模型提供商</label>
+                                    <label class="form-label">AI 模型</label>
                                     <select class="form-control" id="llmProviderSelect" onchange="handleProviderChange()">
-                                        <option value="openai" selected>OpenAI</option>
-                                        <option value="anthropic">Claude (Anthropic)</option>
-                                        <option value="qwen">通义千问 (Qwen)</option>
-                                        <option value="minimax">MiniMax</option>
-                                        <option value="sohu">搜狐大模型</option>
-                                        <option value="trial">使用内置模型(Deepseek)</option>
-                                        <option value="custom">通用模型（自定义配置）</option>
+                                        <option value="trial" selected>DeepSeek（基础版）</option>
+                                        <option value="ark">火山方舟（进阶版）</option>
+                                        <option value="custom">自定义模型</option>
                                     </select>
                                 </div>
                                 
-                                <!-- OpenAI API Key Input -->
-                                <div class="form-group" id="openaiApiKeyGroup">
+                                <!-- OpenAI API Key Input (legacy, hidden — kept for backwards compat) -->
+                                <div class="form-group" id="openaiApiKeyGroup" style="display: none;">
                                     <label class="form-label">OpenAI API 密钥</label>
                                     <div class="input-group">
                                         <input type="password" class="form-control" id="openaiApiKeyInput" placeholder="输入您的 OpenAI API 密钥">
@@ -3064,18 +3060,18 @@
             });
             
             // Set initial provider dropdown state
-            const savedProvider = localStorage.getItem('quantagent_provider') || 'openai';
-            if (savedProvider) {
-                document.getElementById('llmProviderSelect').value = savedProvider;
-                handleProviderChange();
-            } else {
-                checkApiKeyStatus();
+            const validProviders = ['trial', 'ark', 'custom'];
+            let savedProvider = localStorage.getItem('quantagent_provider') || 'trial';
+            if (!validProviders.includes(savedProvider)) {
+                savedProvider = 'trial';
             }
+            document.getElementById('llmProviderSelect').value = savedProvider;
+            handleProviderChange();
         });
         
         function checkApiKeyStatus() {
-            const provider = document.getElementById('llmProviderSelect')?.value || 'openai';
-            if (provider === 'trial') {
+            const provider = document.getElementById('llmProviderSelect')?.value || 'trial';
+            if (provider === 'trial' || provider === 'ark') {
                 hideApiKeyMessages();
                 const activeGroup = document.getElementById('activeApiKeyGroup');
                 if (activeGroup) activeGroup.style.display = 'none';
@@ -3132,19 +3128,19 @@
             document.getElementById('activeApiKeyDisplay').textContent = value;
             const button = document.getElementById('toggleApiKeyVisibilityBtn');
             const clearButton = document.getElementById('clearApiKeyBtn');
-            const provider = document.getElementById('llmProviderSelect')?.value || 'openai';
-            const isTrialProvider = provider === 'trial';
-            button.disabled = !hasKey || isTrialProvider;
-            button.title = isTrialProvider ? '内置模型 Key 不可查看' : (activeApiKeyRevealed ? '隐藏完整 API Key' : '显示完整 API Key');
-            clearButton.disabled = !hasKey || isTrialProvider;
-            clearButton.title = isTrialProvider ? '试用模型内置 Key 不可清除' : '不再使用当前 API Key';
+            const provider = document.getElementById('llmProviderSelect')?.value || 'trial';
+            const isBuiltin = (provider === 'trial' || provider === 'ark');
+            button.disabled = !hasKey || isBuiltin;
+            button.title = isBuiltin ? '内置模型 Key 不可查看' : (activeApiKeyRevealed ? '隐藏完整 API Key' : '显示完整 API Key');
+            clearButton.disabled = !hasKey || isBuiltin;
+            clearButton.title = isBuiltin ? '内置模型 Key 不可清除' : '不再使用当前 API Key';
             button.querySelector('i').className = activeApiKeyRevealed ? 'fas fa-eye-slash' : 'fas fa-eye';
         }
 
         function toggleActiveApiKeyVisibility() {
-            const provider = document.getElementById('llmProviderSelect')?.value || 'openai';
-            if (provider === 'trial') {
-                showApiKeyStatus('使用内置模型(Deepseek)，Key 不可查看。');
+            const provider = document.getElementById('llmProviderSelect')?.value || 'trial';
+            if (provider === 'trial' || provider === 'ark') {
+                showApiKeyStatus('内置模型的 API Key 不可查看。');
                 return;
             }
             if (activeApiKeyRevealed) {
@@ -3525,40 +3521,37 @@
              sohuGroup.style.display = 'none';
              customGroup.style.display = 'none';
              customAdvice.style.display = 'none';
-             if (activeGroup) activeGroup.style.display = provider === 'trial' ? 'none' : 'block';
+             // 内置模型（trial / ark）不需要显示 Key 输入区和"正在使用"区
+             const isBuiltin = (provider === 'trial' || provider === 'ark');
+             if (activeGroup) activeGroup.style.display = isBuiltin ? 'none' : 'block';
 
-             // Show the selected provider's group
-             if (provider === 'openai') {
-                 openaiGroup.style.display = 'block';
-             } else if (provider === 'anthropic') {
-                 anthropicGroup.style.display = 'block';
-             } else if (provider === 'qwen') {
-                 qwenGroup.style.display = 'block';
-             } else if (provider === 'minimax') {
-                 minimaxGroup.style.display = 'block';
-             } else if (provider === 'sohu') {
-                 sohuGroup.style.display = 'block';
-             } else if (provider === 'trial') {
+             if (provider === 'trial') {
                  activeApiKeyRevealed = false;
-                 updateActiveApiKeyDisplay('未设置 API Key', false);
-                 hideApiKeyMessages();
+                 updateActiveApiKeyDisplay('DeepSeek 内置密钥', true);
+                 showApiKeyStatus('已选择 DeepSeek（基础版），内置 API Key，无需配置。');
+             } else if (provider === 'ark') {
+                 activeApiKeyRevealed = false;
+                 updateActiveApiKeyDisplay('火山方舟内置密钥', true);
+                 showApiKeyStatus('已选择火山方舟（进阶版），内置 API Key，支持视觉分析，无需配置。');
              } else if (provider === 'custom') {
                  customGroup.style.display = 'block';
                  customAdvice.style.display = 'flex';
                  handleCustomModeChange();
              }
-             
+
              // Update provider on backend
              updateProvider(provider);
-             
+
              // Check API key status for the selected provider
-             checkApiKeyStatus();
+             if (!isBuiltin) checkApiKeyStatus();
          }
          
          function updateProvider(provider) {
              // Save provider preference
              localStorage.setItem('quantagent_provider', provider);
-             const payload = { provider: provider };
+             // 火山方舟（ark）在后端走 anthropic 兼容协议，key 已通过环境变量内置
+             const backendProvider = provider === 'ark' ? 'anthropic' : provider;
+             const payload = { provider: backendProvider };
              if (provider === 'custom') {
                  payload.mode = document.getElementById('customModeSelect')?.value || 'openai';
                  payload.base_url = getCustomBaseUrlForMode(payload.mode);

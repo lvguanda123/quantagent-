@@ -1293,6 +1293,17 @@ def update_provider():
         elif provider == "trial":
             analyzer.config["agent_llm_model"] = analyzer.config.get("trial_model", "deepseek-chat")
             analyzer.config["graph_llm_model"] = analyzer.config.get("trial_model", "deepseek-chat")
+        elif provider == "anthropic":
+            # 火山方舟（进阶版）走 Anthropic 兼容协议，model/base_url 从环境变量读取
+            ark_model = os.environ.get("ANTHROPIC_MODEL", "ark-code-latest").strip()
+            ark_base = os.environ.get("ANTHROPIC_BASE_URL", "").strip()
+            analyzer.config["agent_llm_model"] = ark_model
+            analyzer.config["graph_llm_model"] = ark_model
+            if ark_base:
+                analyzer.config["base_url"] = ark_base
+            ark_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+            if ark_key:
+                analyzer.config["anthropic_api_key"] = ark_key
         return jsonify({"success": True, "provider": provider})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
