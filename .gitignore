@@ -54,3 +54,8 @@ _builtin_keys.py
 *.msi
 desktop/tauri/src-tauri/target/
 desktop/tauri/target/
+desktop/tauri-academic/bundled-backend/
+desktop/tauri-academic/src-tauri/target/
+desktop/tauri-trader/bundled-backend/
+desktop/tauri-trader/src-tauri/target/
+dist-installers/

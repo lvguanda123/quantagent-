@@ -1,0 +1,136 @@
+import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { cpSync, existsSync, rmSync } from "node:fs";
+import { join, resolve } from "node:path";
+
+const args = process.argv.slice(2);
+const env = {
+  ...process.env,
+  CARGO_HOME: resolve(".cargo-home"),
+};
+
+// Infer the build variant from package.json "name" so we don't have to
+// duplicate the value in every CI workflow. "quantagent-academic" /
+// "quantagent-trader" both end with the variant identifier.
+function detectVariant() {
+  try {
+    const pkg = JSON.parse(readFileSync(resolve("package.json"), "utf8"));
+    const name = String(pkg.name || "");
+    if (name.endsWith("-academic")) return "academic";
+    if (name.endsWith("-trader")) return "trader";
+  } catch (e) {
+    // fall through
+  }
+  return process.env.QUANTAGENT_APP_VARIANT || "trader";
+}
+
+const buildVariant = detectVariant();
+
+if (args[0] === "dev" || args[0] === "build") {
+  run("node", ["scripts/prepare-backend.mjs", `--variant=${buildVariant}`]);
+}
+
+runTauri(args, env);
+
+if (args[0] === "build") {
+  fixMacAppBundle();
+  syncWindowsReleaseResources();
+}
+
+function fixMacAppBundle() {
+  const appPath = resolve("src-tauri/target/release/bundle/macos/QuantAgent.app");
+  if (!existsSync(appPath) || process.platform !== "darwin") {
+    return;
+  }
+
+  syncMacBundledBackend(appPath);
+  removeLegacyMacLaunchFlag(appPath);
+  run("xattr", ["-cr", appPath]);
+  run("codesign", ["--force", "--deep", "--sign", "-", appPath]);
+  run("codesign", ["--verify", "--deep", "--strict", "--verbose=2", appPath]);
+}
+
+function removeLegacyMacLaunchFlag(appPath) {
+  const plistPath = join(appPath, "Contents/Info.plist");
+  for (const key of ["LSRequiresCarbon", "CSResourcesFileMapped"]) {
+    runOptional("/usr/libexec/PlistBuddy", ["-c", `Delete :${key}`, plistPath]);
+  }
+}
+
+function syncMacBundledBackend(appPath) {
+  const source = resolve("bundled-backend");
+  const target = join(appPath, "Contents/Resources/_up_/bundled-backend");
+  if (!existsSync(source)) {
+    return;
+  }
+
+  rmSync(target, { recursive: true, force: true });
+  cpSync(source, target, { recursive: true });
+}
+
+function syncWindowsReleaseResources() {
+  if (process.platform !== "win32") {
+    return;
+  }
+
+  const source = resolve("bundled-backend");
+  if (!existsSync(source)) {
+    return;
+  }
+
+  for (const releaseDir of [
+    resolve("src-tauri/target/release"),
+    resolve("src-tauri/target/x86_64-pc-windows-msvc/release"),
+  ]) {
+    if (!existsSync(releaseDir)) {
+      continue;
+    }
+    for (const target of [
+      join(releaseDir, "_up_/bundled-backend"),
+      join(releaseDir, "bundled-backend"),
+    ]) {
+      rmSync(target, { recursive: true, force: true });
+      cpSync(source, target, { recursive: true });
+    }
+  }
+}
+
+function run(command, commandArgs) {
+  const result = spawnSync(command, commandArgs, {
+    stdio: "inherit",
+    shell: false,
+  });
+
+  if (result.error) {
+    console.error(result.error.message);
+    process.exit(1);
+  }
+
+  if (result.status !== 0) {
+    process.exit(result.status ?? 1);
+  }
+}
+
+function runOptional(command, commandArgs) {
+  spawnSync(command, commandArgs, {
+    stdio: "ignore",
+    shell: false,
+  });
+}
+
+function runTauri(commandArgs, commandEnv) {
+  const result = spawnSync(process.execPath, ["node_modules/@tauri-apps/cli/tauri.js", ...commandArgs], {
+    env: commandEnv,
+    stdio: "inherit",
+    shell: false,
+  });
+
+  if (result.error) {
+    console.error(result.error.message);
+    process.exit(1);
+  }
+
+  if (result.status !== 0) {
+    process.exit(result.status ?? 1);
+  }
+}

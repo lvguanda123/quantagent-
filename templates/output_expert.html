@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuantAgent - 专家分析报告（高校版）</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        (function () {
+            const savedTheme = localStorage.getItem('quantagent_theme') || 'light';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        })();
+    </script>
+    <style>
+        :root {
+            --etrade-purple: #17110A;
+            --etrade-purple-light: #C8A044;
+            --page-bg: #F7F1E7;
+            --white: #ffffff;
+            --gray-50: #F9FAFB;
+            --gray-100: #F3F4F6;
+            --gray-200: #E5E7EB;
+            --gray-300: #D1D5DB;
+            --gray-500: #6B7280;
+            --gray-600: #4B5563;
+            --gray-700: #374151;
+            --gray-800: #1F2937;
+            --text-primary: #1A1712;
+            --text-secondary: #4B4337;
+            --text-muted: #7B7163;
+            --soft-shadow: 0 25px 50px -12px rgba(23, 17, 10, 0.24);
+            --bull: #C0392B;
+            --bear: #27AE60;
+            --neutral: #6B7280;
+        }
+        :root[data-theme="dark"] {
+            --page-bg: #090806;
+            --white: #14110C;
+            --gray-50: #201A11;
+            --gray-100: #263041;
+            --gray-200: #303A4D;
+            --gray-300: #42506A;
+            --gray-500: #9AA8BA;
+            --gray-600: #C7D0DD;
+            --gray-700: #DDE5EE;
+            --gray-800: #EEF2F7;
+            --text-primary: #F7F0DF;
+            --text-secondary: #D9C9A7;
+            --text-muted: #A89772;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--page-bg);
+            color: var(--text-primary);
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            transition: background 0.25s ease, color 0.25s ease;
+        }
+        .header {
+            background:
+                radial-gradient(circle at 50% 18%, rgba(200, 160, 68, 0.22), transparent 32%),
+                linear-gradient(135deg, #050505 0%, #17110A 58%, #C8A044 160%);
+            color: #fff;
+            padding: 1.75rem 1.5rem 1.25rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        .header h1 { margin: 0; font-size: 1.85rem; font-weight: 700; }
+        .header .subtitle { color: rgba(255, 255, 255, 0.78); margin-top: 0.35rem; font-size: 0.95rem; }
+        .header-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+        .btn-academic {
+            background: var(--etrade-purple-light);
+            color: #fff;
+            border: none;
+            padding: 0.55rem 1.1rem;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+        .btn-academic:hover { background: #B08930; color: #fff; }
+        .btn-academic:disabled { background: var(--gray-500); cursor: not-allowed; }
+
+        .main-container {
+            background: var(--white);
+            border-radius: 20px;
+            box-shadow: var(--soft-shadow);
+            margin: 1.5rem auto;
+            max-width: 1320px;
+            overflow: hidden;
+        }
+        .results-section { padding: 1.25rem; }
+
+        /* Two-column layout */
+        .expert-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+            gap: 1.25rem;
+        }
+        @media (max-width: 1024px) {
+            .expert-grid { grid-template-columns: 1fr; }
+        }
+
+        /* Panels */
+        .panel {
+            background: var(--white);
+            border: 2px solid var(--gray-200);
+            border-radius: 16px;
+            padding: 1.1rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            margin-bottom: 1rem;
+        }
+        .panel-title {
+            color: var(--etrade-purple);
+            font-weight: 600;
+            font-size: 1.15rem;
+            margin: 0 0 0.85rem 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .panel-title i { color: var(--etrade-purple-light); }
+
+        /* Decision badge */
+        .decision-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.4rem 1rem;
+            border-radius: 999px;
+            font-size: 1rem;
+            font-weight: 700;
+            color: #fff;
+        }
+        .decision-badge.decision-long  { background: var(--bull); }
+        .decision-badge.decision-short { background: var(--bear); }
+        .decision-badge.decision-neutral { background: var(--neutral); }
+
+        /* Consensus card */
+        .consensus-card {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            background: var(--gray-50);
+            border-radius: 10px;
+            padding: 0.85rem 1rem;
+        }
+        .consensus-card .score {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: var(--etrade-purple);
+            min-width: 60px;
+        }
+        .consensus-card .bar {
+            flex: 1;
+            height: 8px;
+            background: var(--gray-200);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .consensus-card .bar > span {
+            display: block;
+            height: 100%;
+            background: linear-gradient(90deg, #C8A044 0%, #2E7D32 100%);
+        }
+
+        /* Process timeline */
+        .timeline { list-style: none; padding: 0; margin: 0; position: relative; }
+        .timeline::before {
+            content: "";
+            position: absolute;
+            left: 14px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: var(--gray-200);
+        }
+        .timeline li {
+            position: relative;
+            padding: 0.4rem 0 0.4rem 2.5rem;
+            margin-bottom: 0.4rem;
+        }
+        .timeline li .dot {
+            position: absolute;
+            left: 8px;
+            top: 0.6rem;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: var(--gray-300);
+            border: 2px solid var(--white);
+            box-shadow: 0 0 0 1px var(--gray-200);
+        }
+        .timeline li.start .dot { background: #4A6FA5; }
+        .timeline li.end .dot { background: #2E7D32; }
+        .timeline li.error .dot { background: #C0392B; }
+        .timeline li .meta {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+        .timeline li .node { font-weight: 600; }
+        .timeline li .payload {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-top: 0.15rem;
+        }
+
+        /* SVG data-flow diagram */
+        .data-flow-svg { width: 100%; height: auto; display: block; }
+        .data-flow-svg .node-box {
+            fill: var(--white);
+            stroke: var(--etrade-purple-light);
+            stroke-width: 1.5;
+        }
+        :root[data-theme="dark"] .data-flow-svg .node-box {
+            fill: var(--gray-50);
+        }
+        .data-flow-svg .node-label {
+            font-family: 'Segoe UI', sans-serif;
+            font-size: 12px;
+            fill: var(--text-primary);
+            text-anchor: middle;
+            dominant-baseline: middle;
+        }
+        .data-flow-svg .arrow {
+            stroke: var(--text-muted);
+            stroke-width: 1.5;
+            fill: none;
+        }
+
+        /* Agent interaction list */
+        .agent-flow-list { list-style: none; padding: 0; margin: 0; }
+        .agent-flow-list li {
+            padding: 0.45rem 0.6rem;
+            border-left: 3px solid var(--etrade-purple-light);
+            background: var(--gray-50);
+            border-radius: 0 6px 6px 0;
+            margin-bottom: 0.4rem;
+            font-size: 0.9rem;
+        }
+        .agent-flow-list li strong { color: var(--etrade-purple); }
+
+        /* Stats row */
+        .stats-row { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+        .stats-card {
+            flex: 1 1 110px;
+            background: var(--gray-50);
+            border-radius: 8px;
+            padding: 0.7rem 0.85rem;
+            text-align: center;
+        }
+        .stats-card .stats-number { font-size: 1.2rem; font-weight: 700; }
+        .stats-card .stats-label { color: var(--text-muted); font-size: 0.8rem; }
+
+        /* Trade params */
+        .trade-params-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.7rem;
+        }
+        @media (max-width: 768px) {
+            .trade-params-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        .trade-param-card {
+            background: var(--gray-50);
+            border-left: 4px solid var(--etrade-purple-light);
+            padding: 0.7rem 0.85rem;
+            border-radius: 8px;
+        }
+        .trade-param-card .label { font-size: 0.8rem; color: var(--text-muted); }
+        .trade-param-card .value {
+            font-size: 1.2rem;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+        }
+        .trade-param-card.entry   { border-left-color: #C8A044; }
+        .trade-param-card.stop    { border-left-color: #C0392B; }
+        .trade-param-card.target  { border-left-color: #2E7D32; }
+        .trade-param-card.rr      { border-left-color: #4A6FA5; }
+
+        /* Collapsible details */
+        .agent-detail {
+            border: 1px solid var(--gray-200);
+            border-radius: 12px;
+            background: var(--white);
+            margin-bottom: 0.6rem;
+            overflow: hidden;
+        }
+        .agent-detail > summary {
+            list-style: none;
+            cursor: pointer;
+            padding: 0.7rem 0.9rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            user-select: none;
+        }
+        .agent-detail > summary::-webkit-details-marker { display: none; }
+        .agent-detail > summary::after {
+            content: "▾";
+            margin-left: auto;
+            transition: transform 0.2s;
+            color: var(--text-muted);
+        }
+        .agent-detail[open] > summary::after { transform: rotate(180deg); }
+        .agent-detail > summary i {
+            color: var(--etrade-purple-light);
+            width: 1.1rem;
+            text-align: center;
+        }
+        .agent-detail > .body {
+            padding: 0.5rem 0.9rem 0.9rem 0.9rem;
+            border-top: 1px solid var(--gray-100);
+        }
+
+        /* Auto-beautify */
+        .auto-beautify { line-height: 1.8; color: var(--gray-700); }
+        .auto-beautify p { margin-bottom: 0.65rem; }
+        .auto-beautify strong { color: var(--etrade-purple); }
+        .auto-beautify pre {
+            background: var(--gray-50);
+            padding: 0.85rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .analysis-image { max-width: 100%; height: auto; border-radius: 8px; display: block; }
+        .conflict-warn {
+            background: #FFF3CD;
+            border-left: 4px solid #FFB300;
+            padding: 0.7rem 0.9rem;
+            border-radius: 8px;
+            color: #6B4400;
+            margin-top: 0.5rem;
+            font-size: 0.9rem;
+        }
+        :root[data-theme="dark"] .conflict-warn { background: #3D2C0F; color: #FFD28A; }
+        .back-link {
+            display: inline-block;
+            margin-top: 1rem;
+            color: var(--etrade-purple-light);
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .back-link:hover { text-decoration: underline; }
+        .back-row { display: flex; justify-content: space-between; align-items: center; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <h1><i class="fas fa-graduation-cap"></i> 专家分析报告（高校版）</h1>
+            <div class="subtitle">过程可视化 · 三 agent 共识校验 · 可导出 PDF · 支持回测</div>
+        </div>
+        <div class="header-actions">
+            <button id="export-pdf-btn" class="btn-academic" type="button">
+                <i class="fas fa-file-pdf"></i> 导出 PDF
+            </button>
+            <a href="/" class="btn-academic"><i class="fas fa-home"></i> 首页</a>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <div class="results-section">
+
+            <!-- Top decision strip -->
+            <div class="panel">
+                <div style="display:flex; align-items:center; flex-wrap:wrap; gap:1rem;">
+                    {% set direction = (results.decision_direction|default(''))|string|trim %}
+                    {% if direction and ('做多' in direction or 'LONG' in direction|upper) %}
+                        <span class="decision-badge decision-long"><i class="fas fa-arrow-trend-up"></i> 做多 LONG</span>
+                    {% elif direction and ('做空' in direction or 'SHORT' in direction|upper) %}
+                        <span class="decision-badge decision-short"><i class="fas fa-arrow-trend-down"></i> 做空 SHORT</span>
+                    {% elif direction and ('观望' in direction or 'HOLD' in direction|upper) %}
+                        <span class="decision-badge decision-neutral"><i class="fas fa-minus"></i> 观望 HOLD</span>
+                    {% else %}
+                        <span class="decision-badge decision-neutral"><i class="fas fa-minus"></i> 暂无决策</span>
+                    {% endif %}
+                    <div style="flex:1; min-width:240px;">
+                        <strong style="color:var(--etrade-purple);">核心观点：</strong>
+                        {{ results.core_view|default('暂无') }}
+                    </div>
+                    {% if results.forecast_horizon %}
+                    <span class="meta-chip" style="background:var(--gray-50); padding:0.3rem 0.8rem; border-radius:999px; font-size:0.85rem;">
+                        <i class="far fa-clock"></i> 预测 {{ results.forecast_horizon }}
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Two-column main layout -->
+            <div class="expert-grid">
+
+                <!-- LEFT: process visualization -->
+                <div>
+                    <div class="panel">
+                        <div class="panel-title"><i class="fas fa-stream"></i> 节点时间线</div>
+                        <ol class="timeline" id="process-timeline">
+                            {% for ev in (results.process_events or []) %}
+                            <li class="{{ ev.status }}">
+                                <span class="dot"></span>
+                                <div class="meta">{{ ev.ts }}{% if ev.duration_ms %} · {{ ev.duration_ms }}ms{% endif %}</div>
+                                <div class="node">{{ ev.node }} · {{ ev.status }}</div>
+                                {% if ev.payload %}
+                                <div class="payload">
+                                    {% for k, v in ev.payload.items() %}
+                                        <span style="margin-right:0.6rem;"><strong>{{ k }}:</strong> {{ v }}</span>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                            </li>
+                            {% else %}
+                            <li class="start">
+                                <span class="dot"></span>
+                                <div class="meta">暂无事件</div>
+                                <div class="node">未捕获到节点事件</div>
+                            </li>
+                            {% endfor %}
+                        </ol>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-title"><i class="fas fa-project-diagram"></i> 数据传输图</div>
+                        <svg class="data-flow-svg" viewBox="0 0 360 240" xmlns="http://www.w3.org/2000/svg" aria-label="数据流图">
+                            <defs>
+                                <marker id="arrowhead" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+                                    <polygon points="0 0, 8 4, 0 8" fill="currentColor" />
+                                </marker>
+                            </defs>
+                            <!-- START -->
+                            <rect class="node-box" x="140" y="8" width="80" height="32" rx="6" />
+                            <text class="node-label" x="180" y="24">START</text>
+                            <!-- Analysts -->
+                            <rect class="node-box" x="20"  y="100" width="90" height="32" rx="6" />
+                            <text class="node-label" x="65"  y="116">Indicator</text>
+                            <rect class="node-box" x="135" y="100" width="90" height="32" rx="6" />
+                            <text class="node-label" x="180" y="116">Pattern</text>
+                            <rect class="node-box" x="250" y="100" width="90" height="32" rx="6" />
+                            <text class="node-label" x="295" y="116">Trend</text>
+                            <!-- Cross-Checker -->
+                            <rect class="node-box" x="120" y="170" width="120" height="32" rx="6" />
+                            <text class="node-label" x="180" y="186">Cross-Checker</text>
+                            <!-- Decision -->
+                            <rect class="node-box" x="140" y="212" width="80" height="32" rx="6" />
+                            <text class="node-label" x="180" y="228">Decision</text>
+                            <!-- Arrows -->
+                            <g class="arrow" stroke="currentColor" fill="none">
+                                <path d="M65 100 L65 50 L180 50 L180 40" marker-end="url(#arrowhead)" />
+                                <path d="M180 100 L180 50" marker-end="url(#arrowhead)" />
+                                <path d="M295 100 L295 50 L180 50" marker-end="url(#arrowhead)" />
+                                <path d="M65 132 L65 160 L180 160 L180 170" marker-end="url(#arrowhead)" />
+                                <path d="M180 132 L180 170" marker-end="url(#arrowhead)" />
+                                <path d="M295 132 L295 160 L180 160 L180 170" marker-end="url(#arrowhead)" />
+                                <path d="M180 202 L180 212" marker-end="url(#arrowhead)" />
+                            </g>
+                        </svg>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-title"><i class="fas fa-exchange-alt"></i> Agent 交互流</div>
+                        <ul class="agent-flow-list">
+                            <li><strong>START →</strong> 注入 <code>stock_name</code>, <code>time_frame</code>, <code>kline_data</code></li>
+                            <li><strong>Indicator Agent</strong> → 写 <code>indicator_report</code>, <code>rsi</code>, <code>macd</code>, <code>stoch_k/d</code>, <code>roc</code>, <code>willr</code></li>
+                            <li><strong>Pattern Agent</strong> → 写 <code>pattern_report</code>, <code>pattern_chart</code> (base64 PNG)</li>
+                            <li><strong>Trend Agent</strong> → 写 <code>trend_report</code>, <code>trend_chart</code> (base64 PNG)</li>
+                            <li><strong>Cross-Checker</strong> → 写 <code>consensus_score</code>, <code>conflicts</code>, <code>key_points_summary</code>, <code>core_view</code></li>
+                            <li><strong>Decision Maker</strong> → 写 <code>final_trade_decision</code>, <code>decision</code>, <code>entry_price</code>, <code>stop_loss</code>, <code>take_profit</code>, <code>justification</code>, <code>risk_reward_ratio</code>, <code>forecast_horizon</code></li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- RIGHT: financial view -->
+                <div>
+                    <div class="panel">
+                        <div class="panel-title"><i class="fas fa-bullseye"></i> 共识校验（Cross-Checker）</div>
+                        <div class="consensus-card">
+                            <div class="score">{{ ((results.consensus_score|default(0.5)) * 100) | round(1) }}%</div>
+                            <div class="bar"><span style="width: {{ (results.consensus_score|default(0.5) * 100) | round | int }}%;"></span></div>
+                        </div>
+                        <p class="mt-2 mb-1"><strong>冲突点：</strong>{{ results.conflicts|default('无') }}</p>
+                        <p class="mb-1"><strong>共识要点：</strong>{{ results.key_points_summary|default('无') }}</p>
+                        <p class="mb-0"><strong>核心观点：</strong>{{ results.core_view|default('无') }}</p>
+                        {% if results.conflicts %}
+                        <div class="conflict-warn">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            检测到报告分歧，决策应降低权重。
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-title"><i class="fas fa-chart-area"></i> K线 / 形态</div>
+                        {% if results.pattern_chart %}
+                            <img src="data:image/png;base64,{{ results.pattern_chart }}" alt="K线形态" class="analysis-image">
+                        {% else %}
+                            <p class="text-muted mb-0">暂无 K 线图</p>
+                        {% endif %}
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-title"><i class="fas fa-exchange-alt"></i> 交易参数</div>
+                        <div class="trade-params-grid">
+                            <div class="trade-param-card entry">
+                                <div class="label">入场价</div>
+                                <div class="value">{{ results.entry_price if results.entry_price else '—' }}</div>
+                            </div>
+                            <div class="trade-param-card stop">
+                                <div class="label">止损价</div>
+                                <div class="value">{{ results.stop_loss if results.stop_loss else '—' }}</div>
+                            </div>
+                            <div class="trade-param-card target">
+                                <div class="label">止盈价</div>
+                                <div class="value">{{ results.take_profit if results.take_profit else '—' }}</div>
+                            </div>
+                            <div class="trade-param-card rr">
+                                <div class="label">风险收益比</div>
+                                <div class="value">
+                                    {% if results.risk_reward_ratio is not none %}
+                                        {{ '%.2f'|format(results.risk_reward_ratio) }}
+                                    {% else %}—{% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-title"><i class="fas fa-chart-pie"></i> 分析概要</div>
+                        <div class="stats-row">
+                            <div class="stats-card">
+                                <div class="stats-number">{{ results.data_length if results.data_length else '—' }}</div>
+                                <div class="stats-label">数据点</div>
+                            </div>
+                            <div class="stats-card">
+                                <div class="stats-number">{{ results.timeframe if results.timeframe else '—' }}</div>
+                                <div class="stats-label">周期</div>
+                            </div>
+                            <div class="stats-card">
+                                <div class="stats-number">{{ results.asset_name if results.asset_name else '—' }}</div>
+                                <div class="stats-label">标的</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-title"><i class="fas fa-bullseye"></i> 决策理由</div>
+                        {% if results.justification %}
+                            <div class="auto-beautify">{{ results.justification }}</div>
+                        {% else %}
+                            <p class="text-muted mb-0">暂无结构化理由，请参考下方三份分析报告。</p>
+                        {% endif %}
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-title"><i class="fas fa-layer-group"></i> 三 agent 报告（可展开）</div>
+                        <details class="agent-detail" open>
+                            <summary><i class="fas fa-chart-bar"></i> 技术指标</summary>
+                            <div class="body">
+                                {% if results.indicator_report %}
+                                <div class="auto-beautify">{{ results.indicator_report }}</div>
+                                {% else %}
+                                <p class="text-muted mb-0">暂无技术指标报告。</p>
+                                {% endif %}
+                            </div>
+                        </details>
+                        <details class="agent-detail">
+                            <summary><i class="fas fa-search"></i> 形态分析</summary>
+                            <div class="body">
+                                {% if results.pattern_report %}
+                                <div class="auto-beautify">{{ results.pattern_report }}</div>
+                                {% else %}
+                                <p class="text-muted mb-0">暂无形态报告。</p>
+                                {% endif %}
+                            </div>
+                        </details>
+                        <details class="agent-detail">
+                            <summary><i class="fas fa-analytics"></i> 趋势分析</summary>
+                            <div class="body">
+                                {% if results.trend_chart %}
+                                    <img src="data:image/png;base64,{{ results.trend_chart }}" alt="趋势分析" class="analysis-image mb-3">
+                                {% endif %}
+                                {% if results.trend_report %}
+                                <div class="auto-beautify">{{ results.trend_report }}</div>
+                                {% else %}
+                                <p class="text-muted mb-0">暂无趋势报告。</p>
+                                {% endif %}
+                            </div>
+                        </details>
+                    </div>
+                </div>
+            </div>
+
+            <div class="back-row mt-3">
+                <a href="/" class="back-link"><i class="fas fa-arrow-left"></i> 返回首页</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Wire the export button to /api/export. The server returns
+        // application/pdf which we hand back to the user as a download.
+        // We read the current results from sessionStorage (set by
+        // demo_new.html after a successful analyze) so the user doesn't
+        // need to re-run the analysis.
+        (function () {
+            const btn = document.getElementById('export-pdf-btn');
+            if (!btn) return;
+            btn.addEventListener('click', function () {
+                let cached = null;
+                try {
+                    cached = JSON.parse(sessionStorage.getItem('analysisResults') || 'null');
+                } catch (e) {
+                    cached = null;
+                }
+                if (!cached) {
+                    alert('未找到当前分析结果，请返回首页重新运行一次分析。');
+                    return;
+                }
+                btn.disabled = true;
+                const original = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 生成中...';
+                fetch('/api/export', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ results: cached })
+                })
+                    .then(function (r) {
+                        if (!r.ok) {
+                            return r.json().then(function (j) { throw new Error(j.error || ('HTTP ' + r.status)); });
+                        }
+                        return r.blob();
+                    })
+                    .then(function (blob) {
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        const name = (cached.asset_name || 'analysis').replace(/[\\/:*?"<>|]/g, '_');
+                        a.href = url;
+                        a.download = 'quantagent-' + name + '-' + (cached.timeframe || '1d') + '.pdf';
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                    })
+                    .catch(function (e) {
+                        alert('PDF 导出失败：' + e.message);
+                    })
+                    .finally(function () {
+                        btn.disabled = false;
+                        btn.innerHTML = original;
+                    });
+            });
+        })();
+    </script>
+</body>
+</html>

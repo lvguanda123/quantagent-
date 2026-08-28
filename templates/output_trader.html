@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuantAgent - 交易员分析报告</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        (function () {
+            const savedTheme = localStorage.getItem('quantagent_theme') || 'light';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        })();
+    </script>
+    <style>
+        :root {
+            --etrade-purple: #17110A;
+            --etrade-purple-light: #C8A044;
+            --page-bg: #F7F1E7;
+            --white: #ffffff;
+            --gray-50: #F9FAFB;
+            --gray-100: #F3F4F6;
+            --gray-200: #E5E7EB;
+            --gray-300: #D1D5DB;
+            --gray-500: #6B7280;
+            --gray-600: #4B5563;
+            --gray-700: #374151;
+            --gray-800: #1F2937;
+            --text-primary: #1A1712;
+            --text-secondary: #4B4337;
+            --text-muted: #7B7163;
+            --soft-shadow: 0 25px 50px -12px rgba(23, 17, 10, 0.24);
+            --bull: #C0392B;
+            --bear: #27AE60;
+            --neutral: #6B7280;
+        }
+        :root[data-theme="dark"] {
+            --page-bg: #090806;
+            --white: #14110C;
+            --gray-50: #201A11;
+            --gray-100: #263041;
+            --gray-200: #303A4D;
+            --gray-300: #42506A;
+            --gray-500: #9AA8BA;
+            --gray-600: #C7D0DD;
+            --gray-700: #DDE5EE;
+            --gray-800: #EEF2F7;
+            --text-primary: #F7F0DF;
+            --text-secondary: #D9C9A7;
+            --text-muted: #A89772;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--page-bg);
+            color: var(--text-primary);
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            transition: background 0.25s ease, color 0.25s ease;
+        }
+
+        /* ====== Header (compact) ====== */
+        .header {
+            background:
+                radial-gradient(circle at 50% 18%, rgba(200, 160, 68, 0.22), transparent 32%),
+                linear-gradient(135deg, #050505 0%, #17110A 58%, #C8A044 160%);
+            color: #fff;
+            padding: 2rem 1.5rem 1.5rem 1.5rem;
+            text-align: center;
+        }
+        .header h1 { margin: 0; font-size: 2rem; font-weight: 700; }
+        .header .subtitle { color: rgba(255, 255, 255, 0.78); margin-top: 0.4rem; }
+
+        /* ====== Sticky core-view bar ====== */
+        .core-view-bar {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            background: var(--white);
+            border-bottom: 1px solid var(--gray-200);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+            padding: 0.85rem 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        .core-view-bar .core-text {
+            flex: 1 1 240px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        .core-view-bar .core-text .core-label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-right: 0.4rem;
+        }
+        .core-view-bar .meta-chip {
+            background: var(--gray-50);
+            border: 1px solid var(--gray-200);
+            border-radius: 999px;
+            padding: 0.25rem 0.75rem;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+        .core-view-bar .meta-chip strong { color: var(--text-primary); }
+        .consensus-bar {
+            height: 6px;
+            width: 80px;
+            background: var(--gray-200);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .consensus-bar > span {
+            display: block;
+            height: 100%;
+            background: linear-gradient(90deg, #C8A044 0%, #2E7D32 100%);
+        }
+
+        /* ====== Decision badge ====== */
+        .decision-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.45rem 1.1rem;
+            border-radius: 999px;
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: #fff;
+        }
+        .decision-badge.decision-long  { background: var(--bull); }
+        .decision-badge.decision-short { background: var(--bear); }
+        .decision-badge.decision-neutral { background: var(--neutral); }
+
+        /* ====== Panels ====== */
+        .main-container {
+            background: var(--white);
+            border-radius: 20px;
+            box-shadow: var(--soft-shadow);
+            margin: 1.5rem auto;
+            max-width: 1200px;
+            overflow: hidden;
+        }
+        .results-section { padding: 1.5rem; }
+        .panel {
+            background: var(--white);
+            border: 2px solid var(--gray-200);
+            border-radius: 16px;
+            padding: 1.25rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            margin-bottom: 1.25rem;
+        }
+        .panel-title {
+            color: var(--etrade-purple);
+            font-weight: 600;
+            font-size: 1.3rem;
+            margin: 0 0 1rem 0;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+        }
+        .panel-title i {
+            color: var(--etrade-purple-light);
+            font-size: 1.25rem;
+        }
+
+        /* ====== K-line hero panel ====== */
+        .kline-hero-panel { padding: 0.5rem; }
+        .kline-hero-panel img {
+            width: 100%;
+            height: auto;
+            border-radius: 10px;
+            display: block;
+        }
+        .kline-hero-panel .empty {
+            padding: 3rem;
+            text-align: center;
+            color: var(--text-muted);
+        }
+
+        /* ====== Trade params grid ====== */
+        .trade-params-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.85rem;
+        }
+        @media (max-width: 768px) {
+            .trade-params-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        .trade-param-card {
+            background: var(--gray-50);
+            border-left: 4px solid var(--etrade-purple-light);
+            padding: 0.9rem 1rem;
+            border-radius: 8px;
+        }
+        .trade-param-card .label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 0.25rem;
+        }
+        .trade-param-card .value {
+            font-size: 1.35rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            font-family: 'Courier New', monospace;
+        }
+        .trade-param-card.entry   { border-left-color: #C8A044; }
+        .trade-param-card.stop    { border-left-color: #C0392B; }
+        .trade-param-card.target  { border-left-color: #2E7D32; }
+        .trade-param-card.rr      { border-left-color: #4A6FA5; }
+
+        /* ====== Auto-beautify (subset) ====== */
+        .auto-beautify { line-height: 1.8; color: var(--gray-700); }
+        .auto-beautify p { margin-bottom: 0.75rem; }
+        .auto-beautify strong { color: var(--etrade-purple); }
+        .auto-beautify code {
+            background: var(--gray-100);
+            padding: 0.1rem 0.35rem;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+        }
+        .auto-beautify pre {
+            background: var(--gray-50);
+            padding: 1rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.95rem;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        /* ====== Collapsible details (native) ====== */
+        .agent-detail {
+            border: 1px solid var(--gray-200);
+            border-radius: 12px;
+            background: var(--white);
+            margin-bottom: 0.75rem;
+            overflow: hidden;
+        }
+        .agent-detail > summary {
+            list-style: none;
+            cursor: pointer;
+            padding: 0.85rem 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            user-select: none;
+        }
+        .agent-detail > summary::-webkit-details-marker { display: none; }
+        .agent-detail > summary::after {
+            content: "▾";
+            margin-left: auto;
+            transition: transform 0.2s;
+            color: var(--text-muted);
+        }
+        .agent-detail[open] > summary::after { transform: rotate(180deg); }
+        .agent-detail > summary i {
+            color: var(--etrade-purple-light);
+            width: 1.1rem;
+            text-align: center;
+        }
+        .agent-detail > .body {
+            padding: 0.5rem 1.1rem 1.1rem 1.1rem;
+            border-top: 1px solid var(--gray-100);
+        }
+
+        /* ====== Indicator numeric table ====== */
+        .indicator-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.95rem;
+        }
+        .indicator-table th,
+        .indicator-table td {
+            padding: 0.45rem 0.7rem;
+            text-align: right;
+            border-bottom: 1px solid var(--gray-100);
+        }
+        .indicator-table th:first-child,
+        .indicator-table td:first-child {
+            text-align: left;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+        .indicator-table th {
+            background: var(--gray-50);
+            font-weight: 600;
+        }
+
+        /* ====== Misc ====== */
+        .stats-row { display: flex; gap: 1rem; flex-wrap: wrap; }
+        .stats-card {
+            flex: 1 1 120px;
+            background: var(--gray-50);
+            border-radius: 8px;
+            padding: 0.8rem 1rem;
+            text-align: center;
+        }
+        .stats-card .stats-number { font-size: 1.35rem; font-weight: 700; }
+        .stats-card .stats-label { color: var(--text-muted); font-size: 0.85rem; }
+        .conflict-warn {
+            background: #FFF3CD;
+            border-left: 4px solid #FFB300;
+            padding: 0.85rem 1rem;
+            border-radius: 8px;
+            color: #6B4400;
+            margin-top: 0.5rem;
+        }
+        :root[data-theme="dark"] .conflict-warn {
+            background: #3D2C0F;
+            color: #FFD28A;
+        }
+        .analysis-image {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            display: block;
+        }
+        .back-link {
+            display: inline-block;
+            margin-top: 1.5rem;
+            color: var(--etrade-purple-light);
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .back-link:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><i class="fas fa-chart-line"></i> 交易员分析报告</h1>
+        <div class="subtitle">K 线优先 · 核心观点置顶 · 折叠展开细节</div>
+    </div>
+
+    <!-- Sticky core-view bar -->
+    <div class="core-view-bar">
+        {% set direction = (results.decision_direction|default(''))|string|trim %}
+        {% if direction and ('做多' in direction or 'LONG' in direction|upper) %}
+            <span class="decision-badge decision-long"><i class="fas fa-arrow-trend-up"></i> 做多 LONG</span>
+        {% elif direction and ('做空' in direction or 'SHORT' in direction|upper) %}
+            <span class="decision-badge decision-short"><i class="fas fa-arrow-trend-down"></i> 做空 SHORT</span>
+        {% elif direction and ('观望' in direction or 'HOLD' in direction|upper) %}
+            <span class="decision-badge decision-neutral"><i class="fas fa-minus"></i> 观望 HOLD</span>
+        {% else %}
+            <span class="decision-badge decision-neutral"><i class="fas fa-minus"></i> 暂无决策</span>
+        {% endif %}
+
+        <div class="core-text">
+            <span class="core-label">核心观点：</span>
+            {{ results.core_view|default('暂无') }}
+        </div>
+
+        <span class="meta-chip" title="Cross-Checker 共识评分">
+            共识
+            <div class="consensus-bar"><span style="width: {{ (results.consensus_score|default(0.5) * 100) | round | int }}%;"></span></div>
+            <strong>{{ ((results.consensus_score|default(0.5)) * 100) | round(1) }}%</strong>
+        </span>
+        {% if results.forecast_horizon %}
+        <span class="meta-chip"><i class="far fa-clock"></i> 预测 {{ results.forecast_horizon }}</span>
+        {% endif %}
+        {% if results.asset_name %}
+        <span class="meta-chip"><i class="fas fa-tag"></i> {{ results.asset_name }} · {{ results.timeframe }}</span>
+        {% endif %}
+    </div>
+
+    <div class="main-container">
+        <div class="results-section">
+
+            <!-- K-line hero -->
+            <div class="panel kline-hero-panel">
+                <div class="panel-title"><i class="fas fa-chart-area"></i> K线形态（核心）</div>
+                {% if results.pattern_chart %}
+                    <img src="data:image/png;base64,{{ results.pattern_chart }}" alt="K线形态分析图">
+                {% else %}
+                    <div class="empty"><i class="fas fa-image"></i> 暂无 K 线图</div>
+                {% endif %}
+            </div>
+
+            <!-- Trade params -->
+            <div class="panel">
+                <div class="panel-title"><i class="fas fa-exchange-alt"></i> 交易参数</div>
+                <div class="trade-params-grid">
+                    <div class="trade-param-card entry">
+                        <div class="label">入场价</div>
+                        <div class="value">{{ results.entry_price if results.entry_price else '—' }}</div>
+                    </div>
+                    <div class="trade-param-card stop">
+                        <div class="label">止损价</div>
+                        <div class="value">{{ results.stop_loss if results.stop_loss else '—' }}</div>
+                    </div>
+                    <div class="trade-param-card target">
+                        <div class="label">止盈价</div>
+                        <div class="value">{{ results.take_profit if results.take_profit else '—' }}</div>
+                    </div>
+                    <div class="trade-param-card rr">
+                        <div class="label">风险收益比</div>
+                        <div class="value">
+                            {% if results.risk_reward_ratio is not none %}
+                                {{ '%.2f'|format(results.risk_reward_ratio) }}
+                            {% else %}—{% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Summary stats -->
+            <div class="panel">
+                <div class="panel-title"><i class="fas fa-chart-pie"></i> 分析概要</div>
+                <div class="stats-row">
+                    <div class="stats-card">
+                        <div class="stats-number">{{ results.data_length if results.data_length else '—' }}</div>
+                        <div class="stats-label">数据点</div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="stats-number">{{ results.timeframe if results.timeframe else '—' }}</div>
+                        <div class="stats-label">周期</div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="stats-number">{{ results.asset_name if results.asset_name else '—' }}</div>
+                        <div class="stats-label">标的</div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="stats-number">
+                            {% if results.risk_reward_ratio is not none %}
+                                {{ '%.2f'|format(results.risk_reward_ratio) }}
+                            {% else %}—{% endif %}
+                        </div>
+                        <div class="stats-label">R:R</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Decision rationale (always visible) -->
+            <div class="panel">
+                <div class="panel-title"><i class="fas fa-bullseye"></i> 决策理由</div>
+                {% if results.justification %}
+                    <div class="auto-beautify">{{ results.justification }}</div>
+                {% else %}
+                    <p class="text-muted mb-0">暂无结构化理由，请参考下方三份分析报告。</p>
+                {% endif %}
+                {% if results.conflicts %}
+                <div class="conflict-warn">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>报告冲突：</strong> {{ results.conflicts }}
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Collapsible details -->
+            <div class="panel">
+                <div class="panel-title"><i class="fas fa-layer-group"></i> 详细分析（可展开）</div>
+
+                <details class="agent-detail" open>
+                    <summary><i class="fas fa-chart-bar"></i> 技术指标</summary>
+                    <div class="body">
+                        {% if results.indicators %}
+                        <table class="indicator-table">
+                            <thead>
+                                <tr><th>指标</th><th>最新值</th></tr>
+                            </thead>
+                            <tbody>
+                                {% for k, v in (results.indicators or {}).items() %}
+                                <tr>
+                                    <td>{{ k|upper }}</td>
+                                    <td>
+                                        {% if v is mapping %}
+                                            {{ v[-1] if v else '—' }}
+                                        {% elif v is iterable and v is not string %}
+                                            {{ v|list|last }}
+                                        {% else %}
+                                            {{ v if v is not none else '—' }}
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        {% endif %}
+                        {% if results.indicator_report %}
+                        <div class="auto-beautify mt-3">{{ results.indicator_report }}</div>
+                        {% endif %}
+                    </div>
+                </details>
+
+                <details class="agent-detail">
+                    <summary><i class="fas fa-search"></i> 形态分析</summary>
+                    <div class="body">
+                        {% if results.pattern_report %}
+                        <div class="auto-beautify">{{ results.pattern_report }}</div>
+                        {% else %}
+                        <p class="text-muted mb-0">暂无形态分析文本。</p>
+                        {% endif %}
+                    </div>
+                </details>
+
+                <details class="agent-detail">
+                    <summary><i class="fas fa-analytics"></i> 趋势分析</summary>
+                    <div class="body">
+                        {% if results.trend_chart %}
+                            <img src="data:image/png;base64,{{ results.trend_chart }}" alt="趋势分析图" class="analysis-image mb-3">
+                        {% endif %}
+                        {% if results.trend_report %}
+                        <div class="auto-beautify">{{ results.trend_report }}</div>
+                        {% else %}
+                        <p class="text-muted mb-0">暂无趋势分析文本。</p>
+                        {% endif %}
+                    </div>
+                </details>
+
+                <details class="agent-detail">
+                    <summary><i class="fas fa-comments"></i> 共识与冲突（Cross-Checker）</summary>
+                    <div class="body">
+                        <p><strong>共识评分：</strong>{{ ((results.consensus_score|default(0.5)) * 100) | round(1) }}%</p>
+                        <p><strong>冲突点：</strong>{{ results.conflicts|default('无') }}</p>
+                        <p><strong>共识要点：</strong>{{ results.key_points_summary|default('无') }}</p>
+                        {% if results.final_trade_decision %}
+                        <details>
+                            <summary class="text-muted" style="cursor:pointer;">查看原始 JSON 决策</summary>
+                            <pre style="margin-top:0.5rem;">{{ results.final_trade_decision }}</pre>
+                        </details>
+                        {% endif %}
+                    </div>
+                </details>
+            </div>
+
+            <a href="/" class="back-link"><i class="fas fa-arrow-left"></i> 返回首页</a>
+        </div>
+    </div>
+</body>
+</html>

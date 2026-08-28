@@ -25,4 +25,10 @@ DEFAULT_CONFIG = {
     "custom_headers_template": '{"Authorization":"Bearer {{api_key}}","Content-Type":"application/json"}',
     "custom_body_template": '{"model":"{{model}}","messages":{{messages_json}},"temperature":{{temperature}}}',
     "custom_response_path": "choices.0.message.content",
+    # Indicator Agent: when False, skip the LLM tool-calling loop and let the
+    # agent compute all 5 indicators locally (TA-Lib) then call the LLM once
+    # to summarise. Saves ~1-2 LLM round-trips. Set to True only when the model
+    # in use is unreliable at direct tool-calling or you want a verbose
+    # multi-step reasoning trace.
+    "indicator_use_tool_calling": False,
 }

@@ -1,0 +1,150 @@
+name: Build Windows Tauri (Academic / 高校版)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - neoding-demo
+
+jobs:
+  build-academic:
+    runs-on: windows-latest
+    env:
+      ARK_API_KEY: ${{ secrets.ARK_API_KEY }}
+      ARK_BASE_URL: ${{ secrets.ARK_BASE_URL }}
+      ARK_MODEL: ${{ secrets.ARK_MODEL }}
+      DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+      QUANTAGENT_APP_VARIANT: academic
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        shell: bash
+        run: |
+          python -m venv .venv
+          .venv/Scripts/python.exe -m pip install --upgrade pip
+          .venv/Scripts/python.exe -m pip install -r requirements.txt
+
+      - name: Install frontend dependencies
+        working-directory: desktop/tauri-academic
+        run: npm install
+
+      - name: Reset Cargo registry config
+        shell: bash
+        run: |
+          rm -f ~/.cargo/config
+          rm -f ~/.cargo/config.toml
+          rm -f .cargo/config
+          rm -f .cargo/config.toml
+          rm -f desktop/tauri-academic/.cargo/config
+          rm -f desktop/tauri-academic/.cargo/config.toml
+          rm -f desktop/tauri-academic/src-tauri/.cargo/config
+          rm -f desktop/tauri-academic/src-tauri/.cargo/config.toml
+          rm -rf ~/.cargo/registry/index/*
+          cargo --version
+
+      - name: Prepare bundled backend (variant=academic)
+        working-directory: desktop/tauri-academic
+        shell: bash
+        env:
+          ARK_API_KEY: ${{ secrets.ARK_API_KEY }}
+          ARK_BASE_URL: ${{ secrets.ARK_BASE_URL }}
+          ARK_MODEL: ${{ secrets.ARK_MODEL }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          QUANTAGENT_APP_VARIANT: academic
+        run: |
+          node scripts/prepare-backend.mjs --variant=academic
+
+          test -f bundled-backend/backend/_builtin_keys.py
+          test -f bundled-backend/backend/_variant.py
+          echo "--- _variant.py ---"
+          cat bundled-backend/backend/_variant.py
+          echo "--- _builtin_keys.py (masked) ---"
+          sed -E 's/(=.{8}).+/\1****/' bundled-backend/backend/_builtin_keys.py
+
+          rm -rf src-tauri/bundled-backend
+          cp -R bundled-backend src-tauri/bundled-backend
+          test -f bundled-backend/python-runtime/python.exe
+          bundled-backend/python-runtime/python.exe --version
+          bundled-backend/python-runtime/python.exe -c "import sys; sys.path.insert(0, r'bundled-backend/python/site-packages'); import flask, requests, reportlab; print('Bundled Python runtime OK (with reportlab)')"
+
+      - name: Smoke-test bundled Flask backend (academic variant)
+        working-directory: desktop/tauri-academic
+        shell: bash
+        run: |
+          WIN_CWD="$(pwd -W)"
+          export QUANTAGENT_DESKTOP=1
+          export QUANTAGENT_DESKTOP_TOKEN=quantagent-desktop-backend-v2
+          export QUANTAGENT_FLASK_PORT=5099
+          export QUANTAGENT_APP_VARIANT=academic
+          export PYTHONPATH="${WIN_CWD}/bundled-backend/python/site-packages;${WIN_CWD}/bundled-backend/backend"
+          export PYTHONDONTWRITEBYTECODE=1
+          export PYTHONUNBUFFERED=1
+
+          bundled-backend/python-runtime/python.exe bundled-backend/backend/web_interface.py > flask-smoke.log 2>&1 &
+          FLASK_PID=$!
+          ok=0
+          for i in $(seq 1 60); do
+            body=$(curl -s http://127.0.0.1:5099/api/health || true)
+            if echo "$body" | grep -q '"status":"ok"' \
+               && echo "$body" | grep -q '"desktop":true'; then
+              echo "Flask health check OK: $body"
+              ok=1
+              break
+            fi
+            if ! kill -0 "$FLASK_PID" 2>/dev/null; then
+              echo "::error::Flask exited during smoke test"
+              cat flask-smoke.log
+              exit 1
+            fi
+            sleep 2
+          done
+
+          # Academic variant must serve the expert output template.
+          output_body=$(curl -s "http://127.0.0.1:5099/" || true)
+          if ! echo "$output_body" | grep -q 'app_variant'; then
+            echo "::error::Home page missing app_variant context"
+            exit 1
+          fi
+
+          kill "$FLASK_PID" 2>/dev/null || true
+          if [ "$ok" -ne 1 ]; then
+            echo "::error::Flask did not become healthy in time"
+            cat flask-smoke.log
+            exit 1
+          fi
+
+      - name: Build Tauri Windows app (Academic)
+        working-directory: desktop/tauri-academic
+        env:
+          CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+        run: npm run build -- --verbose
+
+      - name: Show build outputs
+        shell: bash
+        run: |
+          find desktop/tauri-academic/src-tauri/target -type f \( -name "*.exe" -o -name "*.msi" -o -name "*.zip" \) | sort
+
+      - name: Upload Windows installer (Academic)
+        uses: actions/upload-artifact@v4
+        with:
+          name: QuantAgent-Academic-Windows-Setup
+          if-no-files-found: error
+          path: |
+            desktop/tauri-academic/src-tauri/target/release/bundle/nsis/*.exe
+            desktop/tauri-academic/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe

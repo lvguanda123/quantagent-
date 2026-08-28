@@ -1,0 +1,153 @@
+name: Build Windows Tauri (Trader / 企业版)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - neoding-demo
+
+jobs:
+  build-trader:
+    runs-on: windows-latest
+    env:
+      ARK_API_KEY: ${{ secrets.ARK_API_KEY }}
+      ARK_BASE_URL: ${{ secrets.ARK_BASE_URL }}
+      ARK_MODEL: ${{ secrets.ARK_MODEL }}
+      DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+      QUANTAGENT_APP_VARIANT: trader
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        shell: bash
+        run: |
+          python -m venv .venv
+          .venv/Scripts/python.exe -m pip install --upgrade pip
+          .venv/Scripts/python.exe -m pip install -r requirements.txt
+
+      - name: Install frontend dependencies
+        working-directory: desktop/tauri-trader
+        run: npm install
+
+      - name: Reset Cargo registry config
+        shell: bash
+        run: |
+          rm -f ~/.cargo/config
+          rm -f ~/.cargo/config.toml
+          rm -f .cargo/config
+          rm -f .cargo/config.toml
+          rm -f desktop/tauri-trader/.cargo/config
+          rm -f desktop/tauri-trader/.cargo/config.toml
+          rm -f desktop/tauri-trader/src-tauri/.cargo/config
+          rm -f desktop/tauri-trader/src-tauri/.cargo/config.toml
+          rm -rf ~/.cargo/registry/index/*
+          cargo --version
+
+      - name: Prepare bundled backend (variant=trader)
+        working-directory: desktop/tauri-trader
+        shell: bash
+        env:
+          ARK_API_KEY: ${{ secrets.ARK_API_KEY }}
+          ARK_BASE_URL: ${{ secrets.ARK_BASE_URL }}
+          ARK_MODEL: ${{ secrets.ARK_MODEL }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          QUANTAGENT_APP_VARIANT: trader
+        run: |
+          node scripts/prepare-backend.mjs --variant=trader
+
+          test -f bundled-backend/backend/_builtin_keys.py
+          test -f bundled-backend/backend/_variant.py
+          echo "--- _variant.py ---"
+          cat bundled-backend/backend/_variant.py
+          echo "--- _builtin_keys.py (masked) ---"
+          sed -E 's/(=.{8}).+/\1****/' bundled-backend/backend/_builtin_keys.py
+
+          rm -rf src-tauri/bundled-backend
+          cp -R bundled-backend src-tauri/bundled-backend
+          test -f bundled-backend/python-runtime/python.exe
+          bundled-backend/python-runtime/python.exe --version
+          # reportlab is optional for trader; we tolerate ImportError here.
+          bundled-backend/python-runtime/python.exe -c "import sys; sys.path.insert(0, r'bundled-backend/python/site-packages'); import flask, requests; print('Bundled Python runtime OK')" || true
+
+      - name: Smoke-test bundled Flask backend (trader variant)
+        working-directory: desktop/tauri-trader
+        shell: bash
+        run: |
+          WIN_CWD="$(pwd -W)"
+          export QUANTAGENT_DESKTOP=1
+          export QUANTAGENT_DESKTOP_TOKEN=quantagent-desktop-backend-v2
+          export QUANTAGENT_FLASK_PORT=5099
+          export QUANTAGENT_APP_VARIANT=trader
+          export PYTHONPATH="${WIN_CWD}/bundled-backend/python/site-packages;${WIN_CWD}/bundled-backend/backend"
+          export PYTHONDONTWRITEBYTECODE=1
+          export PYTHONUNBUFFERED=1
+
+          bundled-backend/python-runtime/python.exe bundled-backend/backend/web_interface.py > flask-smoke.log 2>&1 &
+          FLASK_PID=$!
+          ok=0
+          for i in $(seq 1 60); do
+            body=$(curl -s http://127.0.0.1:5099/api/health || true)
+            if echo "$body" | grep -q '"status":"ok"' \
+               && echo "$body" | grep -q '"desktop":true'; then
+              echo "Flask health check OK: $body"
+              ok=1
+              break
+            fi
+            if ! kill -0 "$FLASK_PID" 2>/dev/null; then
+              echo "::error::Flask exited during smoke test"
+              cat flask-smoke.log
+              exit 1
+            fi
+            sleep 2
+          done
+
+          # Trader variant: /api/backtest must return 403, not 200.
+          backtest_code=$(curl -s -o /dev/null -w "%{http_code}" -X POST -H "Content-Type: application/json" -d '{}' "http://127.0.0.1:5099/api/backtest" || true)
+          if [ "$backtest_code" != "403" ]; then
+            echo "::error::trader variant should reject /api/backtest with 403, got $backtest_code"
+            kill "$FLASK_PID" 2>/dev/null || true
+            exit 1
+          fi
+          echo "Trader variant /api/backtest correctly returned 403"
+
+          kill "$FLASK_PID" 2>/dev/null || true
+          if [ "$ok" -ne 1 ]; then
+            echo "::error::Flask did not become healthy in time"
+            cat flask-smoke.log
+            exit 1
+          fi
+
+      - name: Build Tauri Windows app (Trader)
+        working-directory: desktop/tauri-trader
+        env:
+          CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+        run: npm run build -- --verbose
+
+      - name: Show build outputs
+        shell: bash
+        run: |
+          find desktop/tauri-trader/src-tauri/target -type f \( -name "*.exe" -o -name "*.msi" -o -name "*.zip" \) | sort
+
+      - name: Upload Windows installer (Trader)
+        uses: actions/upload-artifact@v4
+        with:
+          name: QuantAgent-Trader-Windows-Setup
+          if-no-files-found: error
+          path: |
+            desktop/tauri-trader/src-tauri/target/release/bundle/nsis/*.exe
+            desktop/tauri-trader/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe

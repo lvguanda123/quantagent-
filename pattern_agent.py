@@ -6,6 +6,8 @@ from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from openai import RateLimitError
 
+from decision_agent import _to_text
+
 
 def _ensure_dict_args(args):
     """Ensure tool call args is a dict, parsing from JSON string if needed."""
@@ -100,7 +102,7 @@ def _text_pattern_analysis(graph_llm, state, time_frame, pattern_text):
     )
     return {
         "messages": [response],
-        "pattern_report": response.content,
+        "pattern_report": _to_text(response.content),
     }
 
 
@@ -274,7 +276,7 @@ def create_pattern_agent(tool_llm, graph_llm, toolkit):
 
         return {
             "messages": messages + [final_response],
-            "pattern_report": final_response.content,
+            "pattern_report": _to_text(final_response.content),
         }
 
     return pattern_agent_node

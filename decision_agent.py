@@ -1,6 +1,14 @@
 """
-Agent for making final trade decisions in high-frequency trading (HFT) context.
-Combines indicator, pattern, and trend reports to issue a LONG or SHORT order.
+Agent for making final trade decisions.
+
+Combines indicator, pattern, and trend reports to issue a LONG / SHORT order.
+The prompt is selected at runtime based on the analysis timeframe:
+
+  * sub-hour (``1m``/``5m``/``15m``/``30m``/``60m``/``1h``/...)  → HFT mode,
+    forbids holding (观望) and demands an immediate 做多/做空.
+  * daily or longer (``1d``/``1w``/``1mo``/...)               → regular analysis
+    mode, allows 观望 when signals are weak, asks for entry / SL / TP that
+    reflect a longer holding horizon.
 """
 
 import json
@@ -8,6 +16,12 @@ import re
 
 import requests
 from langchain_core.messages import AIMessage
+
+
+# Timeframes shorter than this list (and any string ending in m / min / h / hour)
+# trigger the HFT prompt.  Anything else falls back to regular analysis.
+_LONG_TERM_TIMEFRAMES = frozenset({"1d", "1w", "1wk", "1mo", "1mth", "1y", "1yr",
+                                    "day", "week", "month", "year"})
 
 
 def _to_text(content) -> str:
@@ -59,6 +73,25 @@ def _extract_json(text) -> dict | None:
     return None
 
 
+def _is_high_frequency_timeframe(time_frame: str) -> bool:
+    """Return True for sub-hour timeframes that should use the HFT prompt.
+
+    A timeframe is treated as high-frequency when it ends in ``m`` / ``min`` /
+    ``h`` / ``hour`` (e.g. ``15min``, ``1h``, ``4hour``). Anything else —
+    including unknown strings — is treated as a longer horizon so we never
+    accidentally force HFT semantics on a daily chart.
+    """
+    tf = (time_frame or "").lower().strip()
+    if not tf:
+        return False
+    if tf in _LONG_TERM_TIMEFRAMES:
+        return False
+    for suffix in ("min", "hour", "m", "h"):
+        if tf.endswith(suffix) and len(tf) > len(suffix):
+            return True
+    return False
+
+
 def create_final_trade_decider(llm):
     """
     Create a trade decision agent node. The agent uses LLM to synthesize indicator, pattern, and trend reports
@@ -66,102 +99,127 @@ def create_final_trade_decider(llm):
     """
 
     def trade_decision_node(state) -> dict:
-        indicator_report = state["indicator_report"]
-        pattern_report = state["pattern_report"]
-        trend_report = state["trend_report"]
+        # Truncate the three analyst reports so the prompt stays bounded.
+        # Full reports can run thousands of chars; the decision only needs the
+        # headline signals. Cross-Checker has already compressed the key points.
+        indicator_report = (state.get("indicator_report", "") or "")[:800]
+        pattern_report = (state.get("pattern_report", "") or "")[:800]
+        trend_report = (state.get("trend_report", "") or "")[:800]
+
+        # Consensus fields populated by the Cross-Checker node (may be missing
+        # if the graph is run in legacy mode without that node).
+        consensus_score = float(state.get("consensus_score", 0.5) or 0.5)
+        conflicts = (state.get("conflicts", "") or "").strip()
+        core_view = (state.get("core_view", "") or "").strip()
+        key_points = (state.get("key_points_summary", "") or "").strip()
+
         time_frame = state["time_frame"]
         stock_name = state["stock_name"]
 
         is_sohu = (getattr(llm, "metadata", {}) or {}).get("quantagent_provider") == "sohu"
+        is_hft = _is_high_frequency_timeframe(time_frame)
 
         if is_sohu:
-            prompt = f"""你是量化交易决策助手。请根据三份AI分析，为 {stock_name} 的 {time_frame} K线给出做多或做空决策。
-只输出一个中文JSON对象，不要代码块或额外文字，字段必须为：预测周期、决策、入场价格、止损价格、止盈价格、理由、风险收益比。
-决策只能是“做多”或“做空”；风险收益比应在1.2到1.8之间；理由保持简洁。
-
-技术指标：{indicator_report[:800]}
-形态分析：{pattern_report[:800]}
-趋势分析：{trend_report[:800]}
+            # Sohu fast-path: stay short even in long-term mode (text budget).
+            decision_hint = "仅做多/做空" if is_hft else "可为做多/做空/观望"
+            prompt = f"""你是量化交易决策助手。标的 {stock_name} 周期 {time_frame}（{'高频' if is_hft else '常规'}）。
+共识评分：{consensus_score:.2f}（1=完全一致）；冲突：{conflicts or '无'}；
+核心观点：{core_view}。
+技术指标：{indicator_report}
+形态：{pattern_report}
+趋势：{trend_report}
+要点：{key_points}
+请输出 JSON：预测周期/决策/入场价格/止损价格/止盈价格/理由/风险收益比。决策{decision_hint}。
 """
-        else:
-            # --- System prompt for LLM ---
-            prompt = f"""你是一位高频量化交易（HFT）分析师，当前正在分析 {stock_name} 的 {time_frame} K线图。你的任务是给出**立即执行指令**：**做多（LONG）**或**做空（SHORT）**。⚠️ 由于是HFT环境，禁止持有观望（HOLD）。
+        elif is_hft:
+            # --- System prompt for LLM (HFT mode: sub-hour timeframes) ---
+            prompt = f"""你是高频量化交易（HFT）分析师。当前正在分析 {stock_name} 的 {time_frame} K线，**禁止观望（HOLD）**，必须输出做多或做空。
 
-你的决策应预测**未来 N 根K线**的市场走势，其中：
-- 例如：TIME_FRAME = 15min, N = 1 → 预测未来15分钟。
-- TIME_FRAME = 4hour, N = 1 → 预测未来4小时。
+【共识信息】（由 Cross-Checker 节点提供）
+- 共识评分：{consensus_score:.2f} / 1.0（1=完全一致，0=严重冲突）
+- 冲突点：{conflicts or '无'}
+- 核心观点：{core_view or '无'}
+- 共识要点：{key_points or '无'}
 
-请综合以下三份报告的力量、一致性和时效性做出判断：
+【权重建议】
+- consensus_score >= 0.8：三份报告强共识，可积极行动
+- 0.5 <= consensus_score < 0.8：分歧存在，优先跟随主导趋势
+- consensus_score < 0.5：严重冲突，**降低仓位权重**（在理由中说明）
 
----
+【三份报告】（已截断到 800 字以内）
 
-### 1. 技术指标报告：
-- 评估动量指标（如MACD、ROC）和振荡指标（如RSI、随机指标、威廉指标）。
-- 对**强烈的方向性信号**给予更高权重，如MACD金叉/死叉、RSI背离、极端超买/超卖。
-- 除非多个指标方向一致，否则**忽略或降低中性/混合信号的权重**。
+技术指标：
+{indicator_report}
 
----
+形态分析：
+{pattern_report}
 
-### 2. 形态报告：
-- 仅当形态满足以下条件时才采取行动：
-  - 形态**清晰可辨且基本完成**，且
-  - **突破或跌破已启动**或概率极高（如长上/下影线、放量、吞没K线）。
-- **不要**对早期或猜测性形态采取行动。未获其他报告确认的盘整阶段不可交易。
+趋势分析：
+{trend_report}
 
----
+【决策策略】
+1. 仅基于已确认信号行动，避免新兴、推测性或冲突信号。
+2. 共识强时按共识方向；冲突时选择有动量支撑的一侧。
+3. 风险收益比 1.2~1.8，基于当前波动率和趋势强度。
 
-### 3. 趋势报告：
-- 分析价格与支撑/阻力线的关系：
-  - **向上倾斜的支撑线**表明买盘兴趣。
-  - **向下倾斜的阻力线**表明卖压。
-  - 如果价格在趋势线之间压缩：
-  - **仅在存在强K线或指标确认的共振时才预测突破方向**。
-  - **不要**仅凭几何形态假设突破方向。
-
----
-
-### ✅ 决策策略
-
-1. 仅基于**已确认**的信号行动——避免新兴、推测性或冲突信号。
-2. 优先选择**三份报告（指标、形态、趋势）方向一致**的决策。
-3. 更重视：
-   - 近期强劲动量（如MACD金叉、RSI突破）
-   - 明确的价格行为（如突破K线、拒绝影线、支撑反弹）
-4. 如果报告存在分歧：
-   - 选择**更强且近期有确认**的方向
-   - 优先**有动量支撑的信号**而非微弱的振荡指标暗示。
-5. ⚖️ 如果市场处于盘整或报告存在分歧：
-   - 默认跟随**主导趋势线斜率**（如下降通道中做空）。
-   - 不要猜测方向——选择**更有依据**的一侧。
-6. 建议合理的**风险收益比**在 **1.2 到 1.8** 之间，基于当前波动率和趋势强度。
-
----
-### 🧠 输出格式（JSON，供系统解析）：
-
-```
+【输出格式】（仅一个 JSON 对象，无代码块标记、无额外文字）：
 {{
 "预测周期": "预测下 N 根K线（如15分钟、1小时、1天等）",
 "决策": "做多 或 做空",
-"入场价格": "浮点数，基于当前价格和支撑/阻力的建议入场价",
-"止损价格": "浮点数，止损价以限制下行风险",
-"止盈价格": "浮点数，目标出场价",
-"理由": "基于报告的简明确认性推理",
-"风险收益比": "1.2 到 1.8 之间的浮点数，做多=(止盈-入场)/(入场-止损)，做空=(入场-止盈)/(止损-入场)"
+"入场价格": "浮点数",
+"止损价格": "浮点数",
+"止盈价格": "浮点数",
+"理由": "基于报告和共识的简明确认性推理；如共识低请说明降仓逻辑",
+"风险收益比": "1.2 到 1.8 之间的浮点数"
 }}
 
-⚠️ 重要：整个输出必须使用中文（除"LONG"/"SHORT"关键字外），包括所有字段名和理由。不要输出```json```代码块标记，直接输出纯JSON文本。
+⚠️ 整个输出必须使用中文，包括所有字段名和理由。直接输出纯JSON文本。
+"""
+        else:
+            # --- System prompt for LLM (regular analysis mode: daily / weekly / monthly) ---
+            prompt = f"""你是一位常规技术分析师。当前正在分析 {stock_name} 的 {time_frame} K线。请综合三份独立报告给出**做多、做空或观望**的判断（注意：日线/周线等长周期下，**允许观望**——若信号不明确，优先输出"观望"避免强行交易）。
 
---------
-**技术指标报告**
+【共识信息】（由 Cross-Checker 节点提供）
+- 共识评分：{consensus_score:.2f} / 1.0（1=完全一致，0=严重冲突）
+- 冲突点：{conflicts or '无'}
+- 核心观点：{core_view or '无'}
+- 共识要点：{key_points or '无'}
+
+【决策指引】
+- consensus_score >= 0.8 且方向明确：可积极做多/做空
+- 0.5 <= consensus_score < 0.8：方向需谨慎，建议只在关键位附近行动，否则观望
+- consensus_score < 0.5：严重冲突，**默认输出"观望"**，理由中说明冲突点
+
+【三份报告】（已截断到 800 字以内）
+
+技术指标：
 {indicator_report}
 
-**形态报告**
+形态分析：
 {pattern_report}
 
-**趋势报告**
+趋势分析：
 {trend_report}
 
-        """
+【分析策略】
+1. 重视长期趋势的延续性，忽略短期噪音。
+2. 关键支撑/阻力位的突破或跌破是重要信号。
+3. 形态要求清晰且已确认，模糊形态不交易。
+4. 风险收益比 1.2~2.5 均可（长周期可更宽容）。
+
+【输出格式】（仅一个 JSON 对象，无代码块标记、无额外文字）：
+{{
+"预测周期": "预测的持仓周期（如未来 1-2 周、未来 1 个月）",
+"决策": "做多 / 做空 / 观望",
+"入场价格": "浮点数；如观望则填 0",
+"止损价格": "浮点数；如观望则填 0",
+"止盈价格": "浮点数；如观望则填 0",
+"理由": "基于三份报告和共识的简明分析；若观望请说明原因",
+"风险收益比": "0~3 之间的浮点数；观望填 0"
+}}
+
+⚠️ 整个输出必须使用中文，包括所有字段名和理由。直接输出纯JSON文本。
+"""
 
         # --- LLM call for decision ---
         try:

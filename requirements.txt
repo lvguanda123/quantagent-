@@ -19,3 +19,5 @@ anthropic
 ipython
 Pillow
 requests
+# PDF export (高校版 only, optional — trader variant does not need it)
+reportlab

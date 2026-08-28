@@ -2236,6 +2236,45 @@
                             </div>
                         </div>
                         
+                        <!-- Backtest Parameters (only academic variant) -->
+                        {% if features and features.show_backtest %}
+                        <div class="form-group" style="margin-top: 1.5rem;">
+                            <label class="form-label" style="font-size: 1.2rem; font-weight: 600; color: #374151; margin-bottom: 0.75rem;">
+                                <i class="fas fa-flask" style="color: #6B7280; margin-right: 0.5rem;"></i> 信号回测（仅高校版）
+                            </label>
+                            <div class="row g-2" id="backtest-params">
+                                <div class="col-md-3">
+                                    <label class="form-label" style="font-size:0.85rem;">初始资金（元）</label>
+                                    <input type="number" id="btInitialCapital" class="form-control" value="100000" min="1000" step="1000">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label" style="font-size:0.85rem;">持有 N 根 K 线</label>
+                                    <input type="number" id="btHoldBars" class="form-control" value="5" min="1" max="200">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label" style="font-size:0.85rem;">信号模式</label>
+                                    <select id="btSignalMode" class="form-select">
+                                        <option value="decision">跟随 AI 决策</option>
+                                        <option value="always_long">始终做多</option>
+                                        <option value="always_short">始终做空</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3 d-flex align-items-end">
+                                    <button type="button" class="btn btn-outline-primary w-100" id="runBacktestBtn" onclick="runBacktest()">
+                                        <i class="fas fa-chart-line"></i> 运行回测
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="backtestStatus" class="alert mt-2" role="status" style="display:none;"></div>
+                            <div id="backtestResult" class="mt-3" style="display:none;">
+                                <div class="row" id="backtestMetrics"></div>
+                                <div class="text-center mt-2">
+                                    <img id="backtestEquityImg" alt="资金曲线" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.05);">
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+
                         <!-- Run Analysis Button -->
                         <div class="text-center" style="margin-top: 2rem;">
                             <button class="btn btn-primary btn-lg" id="analyzeBtn" onclick="runAnalysis()" style="padding: 1.5rem 3rem; font-size: 1.3rem; border-radius: 15px;">
@@ -2421,11 +2460,22 @@
                 })
                 .then(data => {
                     const report = data.report || {};
-                    // Reuse the existing output page rendering pipeline.
+                    // Stash the result in the server-side output cache and let
+                    // the /output page render it via ?key=. Falls back to the
+                    // sessionStorage path for backward compatibility.
                     sessionStorage.setItem('analysisResults', JSON.stringify(report));
                     localStorage.setItem('quantagent_last_analysis_results', JSON.stringify(report));
                     closeHistoryModal();
-                    window.location.href = '/output';
+                    fetch('/api/output/prepare', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(report)
+                    })
+                        .then(r => r.ok ? r.json() : null)
+                        .then(prep => {
+                            window.location.href = prep && prep.redirect ? prep.redirect : '/output';
+                        })
+                        .catch(() => { window.location.href = '/output'; });
                 })
                 .catch(err => alert('打开记录失败：' + err.message));
         }
@@ -2603,8 +2653,22 @@
                 showAnalysisStatus('还没有可返回的分析报告，请先运行一次分析。', 'warning');
                 return;
             }
+            let report;
+            try { report = JSON.parse(cached); } catch (e) { report = null; }
             sessionStorage.setItem('analysisResults', cached);
-            window.location.href = '/output';
+            // Stash in server-side cache so /output can render with the real data.
+            if (report) {
+                fetch('/api/output/prepare', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(report)
+                })
+                    .then(r => r.ok ? r.json() : null)
+                    .then(prep => { window.location.href = prep && prep.redirect ? prep.redirect : '/output'; })
+                    .catch(() => { window.location.href = '/output'; });
+            } else {
+                window.location.href = '/output';
+            }
         }
 
         function startAnalysisLoading() {
@@ -3366,6 +3430,90 @@
                  analyzeBtn.innerHTML = originalText;
                  analyzeBtn.disabled = false;
              });
+        }
+
+        // ----- Backtest (academic variant only) -----
+        function runBacktest() {
+            const asset = selectedAsset;
+            const timeframe = selectedTimeframe;
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            const startTime = document.getElementById('startTime').value;
+            const endTime = document.getElementById('endTime').value;
+            const useCurrentTime = document.getElementById('useCurrentTime').checked;
+            const dataSource = selectedDataSource;
+            const initialCapital = parseFloat(document.getElementById('btInitialCapital').value) || 100000;
+            const holdBars = parseInt(document.getElementById('btHoldBars').value, 10) || 5;
+            const signalMode = document.getElementById('btSignalMode').value;
+
+            if (!asset || !timeframe || !startDate || !endDate) {
+                alert('请先填写资产、周期和日期范围，再运行回测。');
+                return;
+            }
+
+            const btn = document.getElementById('runBacktestBtn');
+            const status = document.getElementById('backtestStatus');
+            const result = document.getElementById('backtestResult');
+            const original = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 回测中...';
+            status.className = 'alert alert-info mt-2';
+            status.style.display = 'block';
+            status.textContent = '正在按 ' + signalMode + ' 信号运行回测...';
+            result.style.display = 'none';
+
+            fetch('/api/backtest', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    asset: asset,
+                    timeframe: timeframe,
+                    start_date: startDate,
+                    end_date: endDate,
+                    start_time: startTime,
+                    end_time: endTime,
+                    use_current_time: useCurrentTime,
+                    data_source: dataSource,
+                    initial_capital: initialCapital,
+                    hold_bars: holdBars,
+                    signal_mode: signalMode,
+                })
+            })
+            .then(r => r.json().then(data => ({ ok: r.ok, data })))
+            .then(({ ok, data }) => {
+                if (!ok) throw new Error(data.error || '回测失败');
+                if (!data.metrics) throw new Error('回测返回数据格式错误');
+                // 渲染指标卡片
+                const m = data.metrics;
+                const cards = [
+                    { label: '总收益', value: (m.total_return * 100).toFixed(2) + '%' },
+                    { label: '年化', value: (m.annual_return * 100).toFixed(2) + '%' },
+                    { label: '最大回撤', value: (m.max_drawdown * 100).toFixed(2) + '%' },
+                    { label: '胜率', value: (m.win_rate * 100).toFixed(1) + '%' },
+                    { label: '交易次数', value: m.trade_count },
+                ];
+                const metricsEl = document.getElementById('backtestMetrics');
+                metricsEl.innerHTML = cards.map(c => (
+                    '<div class="col-md-2"><div class="stats-card"><div class="stats-number">'
+                    + c.value + '</div><div class="stats-label">' + c.label + '</div></div></div>'
+                )).join('');
+                // 资金曲线
+                if (data.equity_chart) {
+                    document.getElementById('backtestEquityImg').src = 'data:image/png;base64,' + data.equity_chart;
+                }
+                result.style.display = 'block';
+                status.className = 'alert alert-success mt-2';
+                status.textContent = '回测完成，共 ' + m.trade_count + ' 笔交易。';
+            })
+            .catch(err => {
+                console.error('Backtest error:', err);
+                status.className = 'alert alert-danger mt-2';
+                status.textContent = '回测失败：' + err.message;
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.innerHTML = original;
+            });
         }
 
         function pollAnalysisJob(jobId, analyzeBtn, originalText) {

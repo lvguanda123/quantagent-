@@ -1,6 +1,7 @@
 from typing import Annotated, List, TypedDict
 
 from langchain_core.messages import BaseMessage
+from langgraph.graph import add_messages
 
 
 class IndicatorAgentState(TypedDict):
@@ -58,9 +59,10 @@ class IndicatorAgentState(TypedDict):
 
     # Final analysis and messaging context
     analysis_results: Annotated[str, "Computed result of the analysis or decision"]
-    messages: Annotated[
-        List[BaseMessage], "List of chat messages used in LLM prompt construction"
-    ]
+    # `add_messages` reducer lets the three parallel analysts all write to
+    # `messages` in the same step; without it, LangGraph raises
+    # INVALID_CONCURRENT_GRAPH_UPDATE.
+    messages: Annotated[List[BaseMessage], add_messages]
     decision_prompt: Annotated[str, "decision prompt for reflection"]
     final_trade_decision: Annotated[
         str, "Final BUY or SELL decision made after analyzing indicators"
@@ -82,4 +84,32 @@ class IndicatorAgentState(TypedDict):
     ]
     forecast_horizon: Annotated[
         str, "Predicted time horizon for the trade"
+    ]
+    decision: Annotated[
+        str, "Trade direction extracted from LLM JSON: 做多 / 做空 / 观望"
+    ]
+
+    # Cross-Checker outputs (added for dual-mode + hallucination guard)
+    consensus_score: Annotated[
+        float, "0~1 inter-agent consistency score; 1 = full agreement"
+    ]
+    conflicts: Annotated[
+        str, "Human-readable conflicts between indicator/pattern/trend reports (1-3 sentences)"
+    ]
+    key_points_summary: Annotated[
+        str, "Compressed consensus points (<=200 chars) for downstream Decision agent"
+    ]
+    core_view: Annotated[
+        str, "One-sentence core view (10-30 chars), e.g. 'MACD 金叉 + 双底突破 + 上升趋势线，强烈做多'"
+    ]
+
+    # Process event stream (for expert-mode process visualisation)
+    process_events: Annotated[
+        List[dict],
+        "Ordered list of agent lifecycle events: [{ts, node, status, duration_ms, payload}, ...]",
+    ]
+
+    # UI mode selected by user on the home page
+    mode: Annotated[
+        str, "Report mode selected by user: 'trader' (default) or 'expert'"
     ]

@@ -18,7 +18,7 @@ from langchain_qwq import ChatQwen
 from langgraph.prebuilt import ToolNode
 
 from default_config import DEFAULT_CONFIG
-from graph_setup import SetGraph
+from graph_setup import EventCollector, SetGraph
 from graph_util import TechnicalTools
 
 
@@ -355,13 +355,19 @@ class TradingGraph:
         # --- Create tool nodes for each agent ---
         # self.tool_nodes = self._set_tool_nodes()
 
+        # Per-run event collector (for expert-mode process visualisation).
+        # Each new TradingGraph instance gets a fresh collector.
+        self.event_collector = EventCollector()
+
         # --- Graph logic and setup ---
         self.graph_setup = SetGraph(
             agent_llm=self.agent_llm,       # Indicator Agent
             pattern_llm=self.graph_llm,    # Pattern Agent (uses vision model)
             trend_llm=self.graph_llm,      # Trend Agent (uses vision model)
             decision_llm=self.agent_llm,    # Decision Agent (uses text model)
+            cross_check_llm=self.agent_llm, # Cross-Checker (text-only)
             toolkit=self.toolkit,
+            event_collector=self.event_collector,
             # tool_nodes=self.tool_nodes,
         )
 
@@ -642,13 +648,20 @@ class TradingGraph:
             temperature=self.config.get("graph_llm_temperature", 0.1),
         )
 
-        # Recreate the graph setup with new LLMs
+        # Recreate the graph setup with new LLMs.
+        # Reuse the existing collector (or create a new one) so the previous
+        # run's events are preserved across LLM refreshes.
+        if not hasattr(self, "event_collector") or self.event_collector is None:
+            self.event_collector = EventCollector()
+
         self.graph_setup = SetGraph(
             agent_llm=self.agent_llm,       # Indicator Agent
             pattern_llm=self.graph_llm,    # Pattern Agent (uses vision model)
             trend_llm=self.graph_llm,      # Trend Agent (uses vision model)
             decision_llm=self.agent_llm,    # Decision Agent (uses text model)
+            cross_check_llm=self.agent_llm, # Cross-Checker (text-only)
             toolkit=self.toolkit,
+            event_collector=self.event_collector,
             # tool_nodes=self.tool_nodes,
         )
 

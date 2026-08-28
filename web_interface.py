@@ -4,6 +4,7 @@ Supports AKShare: A-shares, funds, ETF minute data.
 """
 
 import json
+import io
 import os
 import re
 import requests
@@ -15,7 +16,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 import pandas as pd
-from flask import Flask, jsonify, render_template, request, send_from_directory
+from flask import Flask, jsonify, render_template, request, send_file, send_from_directory
 
 _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 if _BASE_DIR.startswith("\\\\?\\"):
@@ -61,7 +62,51 @@ except ImportError:
 
 import static_util
 import history_store
+
+# ---------------------------------------------------------------------------
+# Output cache: the analyze response is too large to fit in a URL query
+# string (base64 PNGs alone are 50-200KB). The desktop WebView2 shell
+# navigates to /output after a successful analyze, so we stash the full
+# response in an in-memory dict keyed by a short UUID and pass the key in
+# the redirect URL. Only the most recent N results are kept to bound
+# memory; older entries are evicted on insert.
+# ---------------------------------------------------------------------------
+_OUTPUT_CACHE_MAX = 8
+_output_cache: Dict[str, dict] = {}
+_output_cache_lock = threading.Lock()
+
+
+def _stash_output_result(payload: dict) -> str:
+    """Store ``payload`` in the output cache and return the lookup key.
+
+    Evicts the oldest entry once the cache exceeds ``_OUTPUT_CACHE_MAX``.
+    """
+    key = uuid.uuid4().hex
+    with _output_cache_lock:
+        while len(_output_cache) >= _OUTPUT_CACHE_MAX:
+            oldest_key = next(iter(_output_cache))
+            _output_cache.pop(oldest_key, None)
+        _output_cache[key] = payload
+    return key
+
+
+def _pop_output_result(key: str):
+    """Return and remove the cached result for ``key`` (if any)."""
+    if not key:
+        return None
+    with _output_cache_lock:
+        return _output_cache.pop(key, None)
 from trading_graph import TradingGraph
+
+# PDF export is academic-only; we import lazily so trader builds without
+# reportlab installed don't fail to start.
+try:
+    import report_export  # type: ignore
+    REPORT_EXPORT_AVAILABLE = True
+except ImportError as error:
+    report_export = None
+    REPORT_EXPORT_AVAILABLE = False
+    print(f"Warning: report_export not available: {error}")
 
 try:
     from data_providers import DataProviderError, FetchRequest, QlibProvider, YahooFinanceProvider
@@ -96,6 +141,38 @@ try:
     history_store.init_db()
 except Exception as error:  # noqa: BLE001 - history is non-critical to startup
     print(f"Warning: could not initialise history database: {error}")
+
+
+# Application variant — selects trader vs academic template + capabilities.
+# Priority: QUANTAGENT_APP_VARIANT env (set by lib.rs) > generated
+# _variant.py (written by prepare-backend.mjs at build time) > "trader".
+def _resolve_app_variant() -> str:
+    env_value = os.environ.get("QUANTAGENT_APP_VARIANT", "").strip().lower()
+    if env_value in ("trader", "academic"):
+        return env_value
+    try:
+        import _variant  # type: ignore  # noqa: F401
+        baked = getattr(_variant, "APP_VARIANT", "").strip().lower()
+        if baked in ("trader", "academic"):
+            return baked
+    except ImportError:
+        pass
+    return "trader"
+
+
+APP_VARIANT = _resolve_app_variant()
+APP_VARIANT_FEATURES = {
+    "academic": {
+        "show_backtest": True,
+        "show_export": True,
+        "show_process": True,
+    },
+    "trader": {
+        "show_backtest": False,
+        "show_export": False,
+        "show_process": False,
+    },
+}[APP_VARIANT]
 
 
 def normalize_custom_base_url(base_url: str) -> str:
@@ -771,6 +848,14 @@ class WebTradingAnalyzer:
 
             final_state = self.trading_graph.graph.invoke(initial_state)
 
+            # Surface the per-node event stream collected during the run so
+            # the expert output template can render the process timeline.
+            collector = self.trading_graph.event_collector
+            if collector is not None and not isinstance(
+                final_state.get("process_events"), list
+            ):
+                final_state["process_events"] = list(collector.events)
+
             return {
                 "success": True,
                 "final_state": final_state,
@@ -880,7 +965,11 @@ def build_trend_fallback_report(final_state: Dict[str, Any]) -> str:
 
 @app.route("/")
 def index():
-    return render_template("demo_new.html")
+    return render_template(
+        "demo_new.html",
+        app_variant=APP_VARIANT,
+        features=APP_VARIANT_FEATURES,
+    )
 
 
 @app.route("/api/analyze", methods=["POST"])
@@ -967,9 +1056,22 @@ def analyze():
         if not _has_report_text(trend_report):
             trend_report = build_trend_fallback_report(final_state)
 
+        # Pull process events off the EventCollector if the trading_graph
+        # didn't already surface them through the state. This keeps the
+        # `process_events` key populated for the academic output template
+        # even on legacy invocations.
+        process_events: list = final_state.get("process_events") or []
+        if not process_events:
+            collector = getattr(analyzer, "trading_graph", None)
+            collector = getattr(collector, "event_collector", None) if collector is not None else None
+            if collector is not None and hasattr(collector, "events"):
+                process_events = list(collector.events)
+
         full_response = {
             "success": True,
             "redirect": "/output",
+            "mode": APP_VARIANT,
+            "app_variant": APP_VARIANT,
             "asset_name": results["asset_name"],
             "timeframe": timeframe,
             "data_length": results["data_length"],
@@ -993,6 +1095,18 @@ def analyze():
             },
             "pattern_chart": results.get("pattern_image", ""),
             "trend_chart": results.get("trend_image", ""),
+            # Cross-Checker outputs (always present, defaults to 0.5 if missing)
+            "consensus_score": final_state.get("consensus_score", 0.5),
+            "conflicts": final_state.get("conflicts", "") or "",
+            "key_points_summary": final_state.get("key_points_summary", "") or "",
+            "core_view": final_state.get("core_view", "") or "",
+            # Decision Maker structured outputs
+            "justification": final_state.get("justification", "") or "",
+            "forecast_horizon": final_state.get("forecast_horizon", "") or "",
+            "risk_reward_ratio": final_state.get("risk_reward_ratio"),
+            "decision": final_state.get("decision", "") or decision_direction,
+            # Process event stream (academic output template)
+            "process_events": process_events,
         }
 
         # Persist to the user's local analysis history (best-effort).
@@ -1008,9 +1122,16 @@ def analyze():
             except Exception as history_error:  # noqa: BLE001
                 print(f"Warning: could not save analysis history: {history_error}")
 
-        # Return as both response and full_results for redirect handling
+        # Return as both response and full_results for redirect handling.
+        # The desktop WebView2 shell navigates to /output after a successful
+        # analyze; we stash the (potentially large) full_response in the
+        # in-memory output cache and pass the key in the redirect URL so the
+        # output page can re-render with the real data instead of the empty
+        # placeholder template.
+        result_key = _stash_output_result(full_response)
+
         return jsonify({
-            "redirect": "/output",
+            "redirect": f"/output?key={result_key}",
             "full_results": full_response
         })
 
@@ -1121,15 +1242,43 @@ def test_data():
 
 @app.route("/output")
 def output():
+    # Pick the output template that matches the application variant. The
+    # trader variant uses a K-line-first layout; the academic variant adds
+    # the process-timeline + PDF export + backtest surfaces.
+    if APP_VARIANT == "academic":
+        output_template = "output_expert.html"
+    else:
+        output_template = "output_trader.html"
+
+    results_key = request.args.get("key")
+    if results_key:
+        cached = _pop_output_result(results_key)
+        if cached:
+            return render_template(
+                output_template,
+                results=cached,
+                app_variant=APP_VARIANT,
+                features=APP_VARIANT_FEATURES,
+            )
+
     results = request.args.get("results")
     if results:
         try:
             results = urllib.parse.unquote(results)
-            return render_template("output.html", results=json.loads(results))
+            parsed_results = json.loads(results)
+            # Backfill the mode/justification/forecast/etc. fields the
+            # earlier client-side `JSON.stringify(full_response)` may have
+            # already produced — we just need to plumb them through.
+            return render_template(
+                output_template,
+                results=parsed_results,
+                app_variant=APP_VARIANT,
+                features=APP_VARIANT_FEATURES,
+            )
         except Exception as e:
             print(f"Error parsing results: {e}")
 
-    return render_template("output.html", results={
+    empty_results = {
         "asset_name": "",
         "timeframe": "1d",
         "data_length": 0,
@@ -1144,7 +1293,133 @@ def output():
         "indicators": {},
         "pattern_chart": "",
         "trend_chart": "",
-    })
+        "consensus_score": 0.5,
+        "conflicts": "",
+        "key_points_summary": "",
+        "core_view": "",
+        "justification": "",
+        "forecast_horizon": "",
+        "risk_reward_ratio": None,
+        "process_events": [],
+        "mode": APP_VARIANT,
+    }
+    return render_template(
+        output_template,
+        results=empty_results,
+        app_variant=APP_VARIANT,
+        features=APP_VARIANT_FEATURES,
+    )
+
+
+@app.route("/api/output/prepare", methods=["POST"])
+def prepare_output():
+    """Stash a results payload in the output cache and return a redirect key.
+
+    Used by the JS clients that already have the full result in memory
+    (analyze flow, history detail) and want to navigate to /output without
+    re-running the analysis. Without this shim the output page would have
+    no way to find the (potentially very large) results payload.
+    """
+    payload = request.get_json(silent=True) or {}
+    if not isinstance(payload, dict) or not payload:
+        return jsonify({"error": "missing or invalid results payload"}), 400
+    key = _stash_output_result(payload)
+    return jsonify({"key": key, "redirect": f"/output?key={key}"})
+
+
+@app.route("/api/export", methods=["POST"])
+def export_report():
+    """Render a PDF of the most recent analysis result.
+
+    The client posts ``{ results: <full_response dict> }`` (the same JSON
+    that ``/api/analyze`` returned). The endpoint is academic-only — the
+    trader variant returns 403 so the UI never even shows the button.
+    """
+    if APP_VARIANT != "academic":
+        return jsonify({"error": "PDF 导出仅高校版可用"}), 403
+    if not REPORT_EXPORT_AVAILABLE or report_export is None:
+        return jsonify({"error": "请先安装 reportlab：pip install reportlab"}), 501
+
+    payload = request.get_json(silent=True) or {}
+    results = payload.get("results") or {}
+    if not isinstance(results, dict) or not results.get("asset_name"):
+        return jsonify({"error": "缺少分析结果（请先运行一次分析）"}), 400
+
+    try:
+        pdf_bytes = report_export.build_analysis_pdf(
+            results,
+            equity_chart=payload.get("equity_chart"),
+            backtest_metrics=payload.get("backtest_metrics"),
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(f"PDF export failed: {exc}")
+        return jsonify({"error": f"PDF 生成失败：{exc}"}), 500
+
+    asset = (results.get("asset_name") or "analysis").replace("/", "_")
+    filename = f"quantagent-{asset}-{results.get('timeframe', '1d')}.pdf"
+    return send_file(
+        io.BytesIO(pdf_bytes),
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=filename,
+    )
+
+
+@app.route("/api/backtest", methods=["POST"])
+def run_backtest():
+    """Signal-driven backtest (academic only)."""
+    if APP_VARIANT != "academic":
+        return jsonify({"error": "回测功能仅高校版可用"}), 403
+
+    try:
+        import backtest as backtest_mod  # local import — optional dep
+    except ImportError as exc:
+        return jsonify({"error": f"回测模块未就绪：{exc}"}), 501
+
+    payload = request.get_json(silent=True) or {}
+    asset = (payload.get("asset") or "").strip()
+    timeframe = (payload.get("timeframe") or "1d").strip()
+    start_date = (payload.get("start_date") or "").strip()
+    end_date = (payload.get("end_date") or "").strip()
+    data_source = (payload.get("data_source") or "akshare").strip()
+    if not asset or not start_date or not end_date:
+        return jsonify({"error": "缺少 asset / start_date / end_date"}), 400
+
+    initial_capital = float(payload.get("initial_capital") or 100000)
+    hold_bars = int(payload.get("hold_bars") or 5)
+    signal_mode = (payload.get("signal_mode") or "decision").strip().lower()
+    if signal_mode not in ("decision", "always_long", "always_short"):
+        signal_mode = "decision"
+
+    start_time = (payload.get("start_time") or "00:00").strip()
+    end_time = (payload.get("end_time") or "23:59").strip()
+
+    try:
+        df = analyzer.fetch_data(
+            asset,
+            timeframe,
+            start_date,
+            end_date,
+            start_time,
+            end_time,
+            data_source,
+        )
+    except Exception as exc:
+        return jsonify({"error": f"行情数据获取失败：{exc}", "stage": "data_fetch"}), 500
+    if df is None or len(df) == 0:
+        return jsonify({"error": "回测无可用数据", "stage": "data_fetch"}), 400
+
+    try:
+        metrics, equity_b64 = backtest_mod.run_simple_backtest(
+            df,
+            signal_mode=signal_mode,
+            hold_bars=hold_bars,
+            initial_capital=initial_capital,
+        )
+    except Exception as exc:
+        return jsonify({"error": f"回测执行失败：{exc}"}), 500
+
+    return jsonify({"metrics": metrics, "equity_chart": equity_b64})
 
 
 @app.route("/api/custom-assets")

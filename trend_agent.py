@@ -9,6 +9,8 @@ import time
 from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from openai import RateLimitError
 
+from decision_agent import _to_text
+
 
 # --- Retry wrapper for LLM invocation ---
 def _ensure_dict_args(args):
@@ -84,7 +86,7 @@ def _text_trend_analysis(graph_llm, state, time_frame, trend_image_b64):
     )
     return {
         "messages": [response],
-        "trend_report": response.content,
+        "trend_report": _to_text(response.content),
         "trend_image": trend_image_b64,
         "trend_image_filename": "trend_graph.png",
         "trend_image_description": "Trend chart generated locally",
@@ -250,7 +252,7 @@ def create_trend_agent(tool_llm, graph_llm, toolkit):
 
         return {
             "messages": messages + [final_response],
-            "trend_report": final_response.content,
+            "trend_report": _to_text(final_response.content),
             "trend_image": trend_image_b64,
             "trend_image_filename": "trend_graph.png",
             "trend_image_description": (
