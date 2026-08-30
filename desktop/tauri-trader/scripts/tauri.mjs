@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -35,6 +35,92 @@ runTauri(args, env);
 if (args[0] === "build") {
   fixMacAppBundle();
   syncWindowsReleaseResources();
+  injectWebView2Loader();
+}
+
+// The webview2-com-sys crate builds WebView2Loader.dll into the cargo
+// target/release directory, but the Tauri-generated NSIS installer.nsi
+// only packages the main exe. Without the DLL beside it, the installed
+// app fails to launch with "找不到 WebView2Loader.dll". Patch the
+// generated installer.nsi to add a File line for the DLL, then re-run
+// makensis so the bundle/nsis/*-setup.exe contains it.
+function injectWebView2Loader() {
+  if (process.platform !== "win32") {
+    return;
+  }
+
+  const releaseDir = resolve("src-tauri/target/release");
+  const dllSrc = join(releaseDir, "WebView2Loader.dll");
+  if (!existsSync(dllSrc)) {
+    console.log(`[inject] WebView2Loader.dll not found at ${dllSrc}, skipping`);
+    return;
+  }
+
+  const nsiPath = join(releaseDir, "nsis/x64/installer.nsi");
+  if (!existsSync(nsiPath)) {
+    console.log(`[inject] installer.nsi not found at ${nsiPath}, skipping`);
+    return;
+  }
+
+  const text = readFileSync(nsiPath, "utf8");
+  if (text.includes("WebView2Loader.dll")) {
+    console.log("[inject] installer.nsi already references WebView2Loader.dll");
+    return;
+  }
+
+  const marker = 'File "${MAINBINARYSRCPATH}"';
+  const idx = text.indexOf(marker);
+  if (idx < 0) {
+    console.log(`[inject] marker ${marker} not found in installer.nsi, skipping`);
+    return;
+  }
+  const insertion = `${marker}\n  File "${dllSrc.replaceAll("\\", "\\\\")}"`;
+  const patched = text.replace(marker, insertion);
+  writeFileSync(nsiPath, patched, "utf8");
+  console.log(`[inject] Patched ${nsiPath} to include WebView2Loader.dll`);
+
+  // Find makensis (NSIS compiler). tauri-cli normally invokes it
+  // directly, so it's shipped with the Tauri toolchain install under
+  // %LocalAppData%\tauri\NSIS\Bin. Walk the standard locations.
+  const candidates = [
+    process.env.LOCALAPPDATA && join(process.env.LOCALAPPDATA, "tauri/NSIS/Bin/makensis.exe"),
+    "C:/Users/Administrator/AppData/Local/tauri/NSIS/Bin/makensis.exe",
+    "C:/Program Files (x86)/NSIS/makensis.exe",
+  ].filter(Boolean);
+  const makensis = candidates.find((p) => existsSync(p));
+  if (!makensis) {
+    console.error("[inject] makensis not found; install NSIS to bake the DLL");
+    return;
+  }
+
+  const result = spawnSync(makensis, [nsiPath], { stdio: "inherit" });
+  if (result.status !== 0) {
+    console.error(`[inject] makensis exited with status ${result.status}`);
+    return;
+  }
+
+  // makensis writes the configured OutFile (nsis-output.exe) next to
+  // installer.nsi. Replace the bundle/nsis/*-setup.exe with it.
+  const generated = join(releaseDir, "nsis/x64/nsis-output.exe");
+  if (!existsSync(generated)) {
+    console.error(`[inject] Expected ${generated} after makensis, not found`);
+    return;
+  }
+  const bundleDir = join(releaseDir, "bundle/nsis");
+  if (existsSync(bundleDir)) {
+    const { readdirSync, unlinkSync } = require("node:fs");
+    for (const name of readdirSync(bundleDir)) {
+      if (name.endsWith("-setup.exe")) {
+        unlinkSync(join(bundleDir, name));
+      }
+    }
+    cpSync(generated, join(bundleDir, `QuantAgent-${capitalize(buildVariant)}_0.1.0_x64-setup.exe`));
+    console.log(`[inject] Replaced bundle installer with ${generated}`);
+  }
+}
+
+function capitalize(s) {
+  return s ? s[0].toUpperCase() + s.slice(1) : s;
 }
 
 function fixMacAppBundle() {
