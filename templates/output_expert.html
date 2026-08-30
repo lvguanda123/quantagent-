@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>QuantAgent - 分析流程（高校版）</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdnjsflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script>
         (function () {
             const savedTheme = localStorage.getItem('quantagent_theme') || 'light';
@@ -16,6 +16,7 @@
         :root {
             --etrade-purple: #17110A;
             --etrade-purple-light: #C8A044;
+            --etrade-purple-soft: #F1DFA2;
             --page-bg: #F7F1E7;
             --white: #ffffff;
             --gray-50: #F9FAFB;
@@ -36,6 +37,8 @@
             --robot-bg: #FFF8E7;
             --robot-border: #C8A044;
             --pipeline-arrow: #C8A044;
+            --canvas: #FFFCF3;
+            --canvas-border: #E5D6A4;
         }
         :root[data-theme="dark"] {
             --page-bg: #090806;
@@ -52,6 +55,8 @@
             --text-secondary: #D9C9A7;
             --text-muted: #A89772;
             --robot-bg: #2A1F0F;
+            --canvas: #1A140A;
+            --canvas-border: #5B4715;
         }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -67,21 +72,21 @@
                 radial-gradient(circle at 50% 18%, rgba(200, 160, 68, 0.22), transparent 32%),
                 linear-gradient(135deg, #050505 0%, #17110A 58%, #C8A044 160%);
             color: #fff;
-            padding: 1.75rem 1.5rem 1.25rem 1.5rem;
+            padding: 1.5rem 1.5rem 1.1rem 1.5rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
             gap: 1rem;
         }
-        .header h1 { margin: 0; font-size: 1.85rem; font-weight: 700; }
-        .header .subtitle { color: rgba(255, 255, 255, 0.78); margin-top: 0.35rem; font-size: 0.95rem; }
+        .header h1 { margin: 0; font-size: 1.7rem; font-weight: 700; }
+        .header .subtitle { color: rgba(255, 255, 255, 0.78); margin-top: 0.3rem; font-size: 0.9rem; }
         .header-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
         .btn-academic {
             background: var(--etrade-purple-light);
             color: #fff;
             border: none;
-            padding: 0.55rem 1.1rem;
+            padding: 0.5rem 1rem;
             border-radius: 8px;
             font-weight: 600;
             cursor: pointer;
@@ -89,9 +94,9 @@
             display: inline-flex;
             align-items: center;
             gap: 0.4rem;
+            font-size: 0.92rem;
         }
         .btn-academic:hover { background: #B08930; color: #fff; }
-        .btn-academic:disabled { background: var(--gray-500); cursor: not-allowed; }
         .btn-ghost {
             background: rgba(255, 255, 255, 0.12);
             color: #fff;
@@ -114,20 +119,17 @@
             display: flex;
             align-items: center;
             flex-wrap: wrap;
-            gap: 1rem;
-            background: linear-gradient(135deg, #FFF8E7 0%, #fff 100%);
+            gap: 0.75rem;
+            background: linear-gradient(135deg, var(--robot-bg) 0%, var(--white) 100%);
             border: 2px solid var(--etrade-purple-light);
             border-radius: 16px;
-            padding: 1rem 1.25rem;
+            padding: 0.85rem 1.1rem;
             margin-bottom: 1.25rem;
-        }
-        :root[data-theme="dark"] .decision-bar {
-            background: linear-gradient(135deg, #2A1F0F 0%, var(--white) 100%);
         }
         .decision-bar .core-view {
             flex: 1;
             min-width: 240px;
-            font-size: 1.05rem;
+            font-size: 1rem;
             line-height: 1.5;
         }
         .decision-bar .core-view strong { color: var(--etrade-purple); }
@@ -136,19 +138,19 @@
             align-items: center;
             gap: 0.35rem;
             background: var(--gray-50);
-            padding: 0.3rem 0.8rem;
+            padding: 0.3rem 0.75rem;
             border-radius: 999px;
-            font-size: 0.85rem;
+            font-size: 0.82rem;
+            color: var(--text-secondary);
         }
 
-        /* Decision badge */
         .decision-badge {
             display: inline-flex;
             align-items: center;
             gap: 0.4rem;
-            padding: 0.45rem 1.05rem;
+            padding: 0.4rem 0.95rem;
             border-radius: 999px;
-            font-size: 1rem;
+            font-size: 0.95rem;
             font-weight: 700;
             color: #fff;
         }
@@ -156,19 +158,16 @@
         .decision-badge.decision-short { background: var(--bear); }
         .decision-badge.decision-neutral { background: var(--neutral); }
 
-        /* === PIPELINE (HERO) === */
-        .pipeline-section {
-            background: linear-gradient(180deg, var(--robot-bg) 0%, var(--white) 100%);
-            border: 2px solid var(--etrade-purple-light);
-            border-radius: 18px;
-            padding: 1.5rem 1.25rem 1.25rem 1.25rem;
+        /* === Section common === */
+        .section-card {
+            background: var(--white);
+            border: 1.5px solid var(--gray-200);
+            border-radius: 16px;
+            padding: 1.25rem;
             margin-bottom: 1.25rem;
         }
-        :root[data-theme="dark"] .pipeline-section {
-            background: linear-gradient(180deg, var(--robot-bg) 0%, var(--white) 100%);
-        }
-        .pipeline-section .section-title {
-            font-size: 1.15rem;
+        .section-card .section-title {
+            font-size: 1.1rem;
             font-weight: 700;
             color: var(--etrade-purple);
             margin: 0 0 0.25rem 0;
@@ -176,89 +175,178 @@
             align-items: center;
             gap: 0.5rem;
         }
-        .pipeline-section .section-sub {
+        .section-card .section-sub {
             font-size: 0.85rem;
             color: var(--text-muted);
-            margin-bottom: 1.25rem;
+            margin-bottom: 1rem;
         }
-        .pipeline {
+
+        /* === HERO canvas — flow + data format === */
+        .flow-canvas {
+            background: var(--canvas);
+            border: 2px dashed var(--canvas-border);
+            border-radius: 14px;
+            padding: 1.25rem 1rem;
+            position: relative;
+        }
+        .flow-canvas-title {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 0.85rem;
+            text-align: center;
+        }
+
+        .flow-stage {
             display: grid;
-            grid-template-columns: repeat(7, 1fr);
+            grid-template-columns: 1fr;
+            gap: 0.6rem;
+        }
+        .flow-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
             gap: 0.5rem;
             align-items: stretch;
         }
-        @media (max-width: 1100px) {
-            .pipeline { grid-template-columns: repeat(3, 1fr); }
+        @media (max-width: 900px) {
+            .flow-row { grid-template-columns: 1fr; }
         }
-        .pipeline-node {
+        .flow-row.analysts {
+            grid-template-columns: repeat(3, 1fr);
+        }
+        @media (max-width: 900px) {
+            .flow-row.analysts { grid-template-columns: 1fr; }
+        }
+
+        .flow-node {
             background: var(--white);
             border: 1.5px solid var(--gray-200);
             border-radius: 12px;
-            padding: 0.75rem 0.6rem;
+            padding: 0.7rem 0.65rem;
             text-align: center;
             position: relative;
             transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
-            cursor: default;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.3rem;
         }
-        .pipeline-node:hover {
-            transform: translateY(-3px);
+        .flow-node:hover {
+            transform: translateY(-2px);
             border-color: var(--etrade-purple-light);
-            box-shadow: 0 8px 18px rgba(200, 160, 68, 0.18);
+            box-shadow: 0 6px 16px rgba(200, 160, 68, 0.18);
         }
-        .pipeline-node .robot-icon {
-            width: 48px;
-            height: 48px;
-            margin: 0 auto 0.4rem auto;
+        .flow-node .robot-icon {
+            width: 38px;
+            height: 38px;
             display: block;
+            flex-shrink: 0;
         }
-        .pipeline-node .node-name {
-            font-weight: 600;
-            font-size: 0.9rem;
+        .flow-node .node-name {
+            font-weight: 700;
+            font-size: 0.88rem;
             color: var(--etrade-purple);
-            margin-bottom: 0.2rem;
         }
-        .pipeline-node .node-io {
-            font-size: 0.72rem;
+        .flow-node .node-data {
+            font-size: 0.7rem;
             color: var(--text-muted);
             line-height: 1.3;
+            word-break: break-all;
         }
-        .pipeline-node.analyst { border-color: var(--etrade-purple-light); }
-        .pipeline-node.decision { background: linear-gradient(135deg, #FFF8E7, #fff); border-color: var(--etrade-purple); border-width: 2px; }
-        :root[data-theme="dark"] .pipeline-node.decision { background: linear-gradient(135deg, #2A1F0F, var(--white)); }
-        .pipeline-node .core-view-bubble {
-            margin-top: 0.4rem;
-            font-size: 0.75rem;
+        .flow-node .node-io-arrow {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            font-family: 'Courier New', monospace;
+        }
+        .flow-node.analyst {
+            border-color: var(--etrade-purple-light);
+            background: linear-gradient(180deg, #FFFEF5 0%, var(--white) 100%);
+        }
+        :root[data-theme="dark"] .flow-node.analyst {
+            background: linear-gradient(180deg, #2A1F0F 0%, var(--white) 100%);
+        }
+        .flow-node.decision {
+            background: linear-gradient(135deg, var(--etrade-purple) 0%, var(--etrade-purple-light) 120%);
+            border-color: var(--etrade-purple);
+            color: #fff;
+        }
+        .flow-node.decision .node-name,
+        .flow-node.decision .node-data,
+        .flow-node.decision .node-io-arrow {
+            color: rgba(255, 255, 255, 0.92);
+        }
+        .flow-node.decision .robot-icon { filter: invert(1) brightness(1.6); }
+        .flow-arrow-down {
+            text-align: center;
+            color: var(--etrade-purple-light);
+            font-size: 1rem;
+            line-height: 1;
+            margin: 0.05rem 0;
+        }
+        .flow-arrow-side {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--etrade-purple-light);
+            font-size: 1.2rem;
+        }
+        @media (max-width: 900px) {
+            .flow-arrow-side { transform: rotate(90deg); }
+        }
+
+        /* Compact core view bubble inside flow node */
+        .flow-node .bubble {
+            margin-top: 0.3rem;
+            font-size: 0.72rem;
             color: var(--text-secondary);
             background: var(--gray-50);
             border-radius: 6px;
-            padding: 0.35rem 0.4rem;
-            line-height: 1.35;
-            min-height: 36px;
+            padding: 0.3rem 0.4rem;
+            line-height: 1.3;
+            width: 100%;
+            min-height: 30px;
+            text-align: left;
+            border: 1px solid var(--gray-200);
         }
-        .pipeline-node .core-view-bubble.has-data {
+        .flow-node .bubble.has-data {
             color: var(--etrade-purple);
-            background: #FFF8E7;
+            background: var(--robot-bg);
             font-weight: 500;
+            border-color: var(--etrade-purple-soft);
         }
-        :root[data-theme="dark"] .pipeline-node .core-view-bubble.has-data {
+        .flow-node.decision .bubble {
+            background: rgba(255, 255, 255, 0.16);
+            color: #fff;
+            border-color: rgba(255, 255, 255, 0.25);
+        }
+        :root[data-theme="dark"] .flow-node .bubble.has-data {
             background: #3D2C0F;
         }
-        .pipeline-arrow {
-            align-self: center;
-            color: var(--pipeline-arrow);
-            font-size: 1.1rem;
-            text-align: center;
+
+        /* Data format badges */
+        .data-format-strip {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+            justify-content: center;
+            margin: 0.75rem 0 0.25rem 0;
         }
-        @media (max-width: 1100px) {
-            .pipeline-arrow { display: none; }
+        .data-format-chip {
+            font-family: 'Courier New', monospace;
+            font-size: 0.7rem;
+            padding: 0.2rem 0.55rem;
+            border-radius: 4px;
+            background: var(--gray-50);
+            color: var(--text-secondary);
+            border: 1px solid var(--gray-200);
         }
 
-        /* === TRADE PARAMS === */
+        /* === Trade params === */
         .trade-params {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 0.75rem;
-            margin-bottom: 1.25rem;
+            gap: 0.7rem;
         }
         @media (max-width: 768px) {
             .trade-params { grid-template-columns: repeat(2, 1fr); }
@@ -267,7 +355,7 @@
             background: var(--white);
             border: 1.5px solid var(--gray-200);
             border-left: 5px solid var(--etrade-purple-light);
-            padding: 0.85rem 1rem;
+            padding: 0.8rem 0.95rem;
             border-radius: 12px;
             position: relative;
         }
@@ -276,26 +364,26 @@
         .trade-param-card.target  { border-left-color: #2E7D32; }
         .trade-param-card.rr      { border-left-color: #4A6FA5; }
         .trade-param-card .label {
-            font-size: 0.78rem;
+            font-size: 0.74rem;
             color: var(--text-muted);
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
         .trade-param-card .value {
-            font-size: 1.4rem;
+            font-size: 1.35rem;
             font-weight: 700;
             font-family: 'Courier New', monospace;
-            margin-top: 0.2rem;
+            margin-top: 0.15rem;
             color: var(--text-primary);
         }
         .trade-param-card .auto-tag {
             position: absolute;
-            top: 0.55rem;
-            right: 0.55rem;
-            font-size: 0.65rem;
+            top: 0.5rem;
+            right: 0.5rem;
+            font-size: 0.62rem;
             background: #FFF8E7;
             color: #6B4400;
-            padding: 0.1rem 0.45rem;
+            padding: 0.08rem 0.4rem;
             border-radius: 999px;
             border: 1px solid #C8A044;
         }
@@ -304,83 +392,53 @@
             color: #FFD28A;
         }
 
-        /* === CORE-VIEW PROPAGATION CHAIN === */
-        .chain-section {
-            background: var(--white);
-            border: 2px solid var(--gray-200);
-            border-radius: 16px;
-            padding: 1.25rem;
-            margin-bottom: 1.25rem;
-        }
-        .chain-section .section-title {
-            font-size: 1.1rem;
-            font-weight: 700;
-            color: var(--etrade-purple);
-            margin: 0 0 0.25rem 0;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        .chain-section .section-sub {
-            font-size: 0.83rem;
-            color: var(--text-muted);
-            margin-bottom: 1rem;
-        }
+        /* === Propagation chain === */
         .chain {
             display: grid;
             grid-template-columns: repeat(5, 1fr);
-            gap: 0.5rem;
+            gap: 0.45rem;
         }
         @media (max-width: 1024px) { .chain { grid-template-columns: repeat(2, 1fr); } }
         .chain-step {
             background: var(--gray-50);
             border: 1.5px solid var(--gray-200);
             border-radius: 10px;
-            padding: 0.7rem 0.6rem;
+            padding: 0.65rem 0.55rem;
             position: relative;
         }
         .chain-step .step-label {
-            font-size: 0.7rem;
+            font-size: 0.68rem;
             color: var(--text-muted);
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            margin-bottom: 0.25rem;
+            margin-bottom: 0.2rem;
         }
         .chain-step .step-name {
-            font-weight: 600;
-            font-size: 0.9rem;
+            font-weight: 700;
+            font-size: 0.85rem;
             color: var(--etrade-purple);
-            margin-bottom: 0.35rem;
+            margin-bottom: 0.3rem;
         }
         .chain-step .step-text {
-            font-size: 0.82rem;
+            font-size: 0.78rem;
             color: var(--text-secondary);
             line-height: 1.4;
         }
         .chain-step.empty .step-text { color: var(--text-muted); font-style: italic; }
+        .chain-step.final {
+            background: linear-gradient(180deg, #FFF8E7 0%, var(--gray-50) 100%);
+            border-color: var(--etrade-purple-light);
+        }
+        :root[data-theme="dark"] .chain-step.final {
+            background: linear-gradient(180deg, #2A1F0F 0%, var(--gray-50) 100%);
+        }
 
-        /* === TIMELINE (compact) === */
-        .timeline-section {
-            background: var(--white);
-            border: 2px solid var(--gray-200);
-            border-radius: 16px;
-            padding: 1.25rem;
-            margin-bottom: 1.25rem;
-        }
-        .timeline-section .section-title {
-            font-size: 1.1rem;
-            font-weight: 700;
-            color: var(--etrade-purple);
-            margin: 0 0 0.75rem 0;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
+        /* === Timeline === */
         .timeline { list-style: none; padding: 0; margin: 0; position: relative; }
         .timeline::before {
             content: "";
             position: absolute;
-            left: 10px;
+            left: 9px;
             top: 0;
             bottom: 0;
             width: 2px;
@@ -388,14 +446,14 @@
         }
         .timeline li {
             position: relative;
-            padding: 0.3rem 0 0.3rem 2rem;
-            margin-bottom: 0.2rem;
-            font-size: 0.88rem;
+            padding: 0.25rem 0 0.25rem 1.9rem;
+            margin-bottom: 0.15rem;
+            font-size: 0.85rem;
         }
         .timeline li .dot {
             position: absolute;
-            left: 5px;
-            top: 0.55rem;
+            left: 4px;
+            top: 0.5rem;
             width: 12px;
             height: 12px;
             border-radius: 50%;
@@ -407,44 +465,23 @@
         .timeline li.end .dot { background: #2E7D32; }
         .timeline li.error .dot { background: #C0392B; }
         .timeline li .meta {
-            font-size: 0.72rem;
+            font-size: 0.7rem;
             color: var(--text-muted);
         }
         .timeline li .node { font-weight: 600; color: var(--etrade-purple); }
 
-        /* === AGENT REPORT CARDS (collapsed) === */
-        .reports-section {
-            background: var(--white);
-            border: 2px solid var(--gray-200);
-            border-radius: 16px;
-            padding: 1.25rem;
-            margin-bottom: 1.25rem;
-        }
-        .reports-section .section-title {
-            font-size: 1.1rem;
-            font-weight: 700;
-            color: var(--etrade-purple);
-            margin: 0 0 0.5rem 0;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        .reports-section .section-sub {
-            font-size: 0.83rem;
-            color: var(--text-muted);
-            margin-bottom: 0.75rem;
-        }
+        /* === Agent details === */
         .agent-detail {
             border: 1px solid var(--gray-200);
             border-radius: 12px;
             background: var(--white);
-            margin-bottom: 0.6rem;
+            margin-bottom: 0.55rem;
             overflow: hidden;
         }
         .agent-detail > summary {
             list-style: none;
             cursor: pointer;
-            padding: 0.7rem 0.9rem;
+            padding: 0.6rem 0.85rem;
             font-weight: 600;
             display: flex;
             align-items: center;
@@ -460,66 +497,68 @@
         }
         .agent-detail[open] > summary::after { transform: rotate(180deg); }
         .agent-detail > summary .robot-mini {
-            width: 26px;
-            height: 26px;
+            width: 24px;
+            height: 24px;
             flex-shrink: 0;
         }
         .agent-detail > summary .report-summary {
             font-weight: 400;
-            font-size: 0.85rem;
+            font-size: 0.82rem;
             color: var(--text-secondary);
             margin-left: 0.5rem;
             flex: 1;
         }
         .agent-detail > .body {
-            padding: 0.5rem 0.9rem 0.9rem 0.9rem;
+            padding: 0.4rem 0.85rem 0.85rem 0.85rem;
             border-top: 1px solid var(--gray-100);
         }
-        .auto-beautify { line-height: 1.8; color: var(--gray-700); }
-        .auto-beautify p { margin-bottom: 0.65rem; }
+
+        /* === Sanitized prose (no # or * artifacts) === */
+        .auto-beautify { line-height: 1.8; color: var(--text-secondary); white-space: pre-wrap; }
+        .auto-beautify p { margin-bottom: 0.6rem; }
         .auto-beautify strong { color: var(--etrade-purple); }
         .analysis-image {
             max-width: 100%;
             height: auto;
             border-radius: 8px;
             display: block;
-            margin-bottom: 0.75rem;
+            margin-bottom: 0.7rem;
         }
 
-        /* === FULL REPORT CTA === */
+        /* === Full report CTA === */
         .full-report-cta {
             text-align: center;
-            padding: 1.5rem 1rem;
-            background: linear-gradient(135deg, #FFF8E7 0%, #fff 100%);
+            padding: 1.25rem 1rem;
+            background: linear-gradient(135deg, #FFF8E7 0%, var(--white) 100%);
             border: 2px dashed var(--etrade-purple-light);
             border-radius: 16px;
-            margin-bottom: 1rem;
+            margin-bottom: 0.5rem;
         }
         :root[data-theme="dark"] .full-report-cta {
             background: linear-gradient(135deg, #2A1F0F 0%, var(--white) 100%);
         }
         .full-report-cta h3 {
             color: var(--etrade-purple);
-            margin: 0 0 0.4rem 0;
-            font-size: 1.15rem;
+            margin: 0 0 0.35rem 0;
+            font-size: 1.1rem;
         }
         .full-report-cta p {
             color: var(--text-secondary);
-            margin: 0 0 0.85rem 0;
-            font-size: 0.9rem;
+            margin: 0 0 0.75rem 0;
+            font-size: 0.88rem;
         }
         .btn-primary-cta {
             background: var(--etrade-purple);
             color: #fff;
             border: none;
-            padding: 0.7rem 1.5rem;
+            padding: 0.6rem 1.4rem;
             border-radius: 999px;
             font-weight: 600;
             text-decoration: none;
             display: inline-flex;
             align-items: center;
             gap: 0.5rem;
-            font-size: 1rem;
+            font-size: 0.95rem;
         }
         .btn-primary-cta:hover { background: #000; color: #fff; }
 
@@ -543,10 +582,10 @@
             <a id="full-report-link" href="/output?view=full" class="btn-academic">
                 <i class="fas fa-file-alt"></i> 查看完整分析报告
             </a>
-            <button id="export-pdf-btn" class="btn-ghost" style="background: rgba(255,255,255,0.12); color:#fff; border:1px solid rgba(255,255,255,0.4); padding:0.55rem 1.1rem; border-radius:8px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:0.4rem;" type="button">
+            <button id="export-pdf-btn" class="btn-ghost" style="background: rgba(255,255,255,0.12); color:#fff; border:1px solid rgba(255,255,255,0.4); padding:0.5rem 1rem; border-radius:8px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:0.4rem; font-size:0.92rem;" type="button">
                 <i class="fas fa-file-pdf"></i> 导出 PDF
             </button>
-            <a href="/" class="btn-ghost" style="background: rgba(255,255,255,0.12); color:#fff; border:1px solid rgba(255,255,255,0.4); padding:0.55rem 1.1rem; border-radius:8px; font-weight:600; text-decoration:none; display:inline-flex; align-items:center; gap:0.4rem;">
+            <a href="/" class="btn-ghost" style="background: rgba(255,255,255,0.12); color:#fff; border:1px solid rgba(255,255,255,0.4); padding:0.5rem 1rem; border-radius:8px; font-weight:600; text-decoration:none; display:inline-flex; align-items:center; gap:0.4rem; font-size:0.92rem;">
                 <i class="fas fa-home"></i> 首页
             </a>
         </div>
@@ -556,8 +595,8 @@
         <div class="results-section">
 
             {# === Decision bar === #}
+            {% set direction = (results.decision_direction|default(''))|string|trim %}
             <div class="decision-bar">
-                {% set direction = (results.decision_direction|default(''))|string|trim %}
                 {% if direction and ('做多' in direction or 'LONG' in direction|upper) %}
                     <span class="decision-badge decision-long"><i class="fas fa-arrow-trend-up"></i> 做多 LONG</span>
                 {% elif direction and ('做空' in direction or 'SHORT' in direction|upper) %}
@@ -581,166 +620,200 @@
                 {% endif %}
             </div>
 
-            {# === HERO: Pipeline diagram === #}
-            <div class="pipeline-section">
+            {# === HERO: vertical flow canvas (rebuilt layout) === #}
+            <div class="section-card">
                 <h2 class="section-title"><i class="fas fa-sitemap"></i> 数据流转与多智能体协作</h2>
-                <div class="section-sub">从 {{ results.data_source|default('akshare') }} 拉取 OHLC → 渲染 K 线 → 并行 3 个分析 agent → 共识校验 → 最终决策</div>
+                <div class="section-sub">从 {{ results.data_source|default('akshare') }} 拉取原始数据 → 渲染 K 线 → 并行 3 个分析 agent → 共识校验 → 最终决策</div>
 
-                <div class="pipeline">
-                    {# 1. Data source #}
-                    <div class="pipeline-node">
-                        <svg class="robot-icon" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-label="数据源">
-                            <rect x="6" y="10" width="36" height="28" rx="4" fill="#FFF8E7" stroke="#C8A044" stroke-width="2"/>
-                            <path d="M6 18 L42 18" stroke="#C8A044" stroke-width="1.5"/>
-                            <circle cx="13" cy="14" r="1.5" fill="#C0392B"/>
-                            <circle cx="18" cy="14" r="1.5" fill="#C8A044"/>
-                            <text x="24" y="34" text-anchor="middle" font-size="10" fill="#17110A" font-weight="600">DATA</text>
-                        </svg>
-                        <div class="node-name">数据源</div>
-                        <div class="node-io">{{ results.data_source|default('akshare') }}<br>OHLC JSON</div>
-                    </div>
-                    <div class="pipeline-arrow"><i class="fas fa-arrow-right"></i></div>
+                <div class="flow-canvas">
+                    <div class="flow-canvas-title">数据流 &amp; 智能体编排</div>
 
-                    {# 2. K-line generator #}
-                    <div class="pipeline-node">
-                        <svg class="robot-icon" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-label="K线生成">
-                            <rect x="6" y="10" width="36" height="28" rx="4" fill="#FFF8E7" stroke="#C8A044" stroke-width="2"/>
-                            <line x1="14" y1="32" x2="14" y2="20" stroke="#27AE60" stroke-width="1.5"/>
-                            <rect x="12" y="22" width="4" height="6" fill="#27AE60"/>
-                            <line x1="24" y1="34" x2="24" y2="14" stroke="#C0392B" stroke-width="1.5"/>
-                            <rect x="22" y="20" width="4" height="8" fill="#C0392B"/>
-                            <line x1="34" y1="30" x2="34" y2="22" stroke="#27AE60" stroke-width="1.5"/>
-                            <rect x="32" y="24" width="4" height="4" fill="#27AE60"/>
-                        </svg>
-                        <div class="node-name">K 线生成</div>
-                        <div class="node-io">matplotlib<br>base64 PNG</div>
-                    </div>
-                    <div class="pipeline-arrow"><i class="fas fa-arrow-right"></i></div>
+                    {# 1) Data source row #}
+                    <div class="flow-stage">
+                        <div class="flow-row">
+                            <div class="flow-node">
+                                <svg class="robot-icon" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-label="数据源">
+                                    <rect x="6" y="10" width="36" height="28" rx="4" fill="#FFF8E7" stroke="#C8A044" stroke-width="2"/>
+                                    <path d="M6 18 L42 18" stroke="#C8A044" stroke-width="1.5"/>
+                                    <circle cx="13" cy="14" r="1.5" fill="#C0392B"/>
+                                    <circle cx="18" cy="14" r="1.5" fill="#C8A044"/>
+                                    <text x="24" y="34" text-anchor="middle" font-size="10" fill="#17110A" font-weight="600">DATA</text>
+                                </svg>
+                                <div class="node-name">数据源</div>
+                                <div class="node-data">{{ results.data_source|default('akshare') }}</div>
+                            </div>
 
-                    {# 3. Three analysts #}
-                    {% set indicator_view = results.indicator_report|default('') %}
-                    {% set pattern_view = results.pattern_report|default('') %}
-                    {% set trend_view = results.trend_report|default('') %}
-                    <div class="pipeline-node analyst" title="基于 RSI/MACD/ROC/Stoch/Williams 指标">
-                        <svg class="robot-icon" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-label="指标 agent">
-                            <rect x="8" y="14" width="32" height="24" rx="6" fill="#FFF8E7" stroke="#C8A044" stroke-width="2"/>
-                            <rect x="14" y="6" width="20" height="10" rx="2" fill="#FFF8E7" stroke="#C8A044" stroke-width="2"/>
-                            <line x1="20" y1="6" x2="20" y2="16" stroke="#C8A044" stroke-width="1.5"/>
-                            <line x1="28" y1="6" x2="28" y2="16" stroke="#C8A044" stroke-width="1.5"/>
-                            <circle cx="19" cy="26" r="2" fill="#C8A044"/>
-                            <circle cx="29" cy="26" r="2" fill="#C8A044"/>
-                            <rect x="17" y="30" width="14" height="2" fill="#C8A044"/>
-                        </svg>
-                        <div class="node-name">🤖 指标 Agent</div>
-                        <div class="node-io">RSI/MACD/ROC<br>Stoch/Williams</div>
-                        <div class="core-view-bubble {{ 'has-data' if indicator_view else '' }}">
-                            {{ indicator_view[:48] + ('…' if indicator_view|length > 48 else '') if indicator_view else '暂无核心观点' }}
+                            <div class="flow-node">
+                                <svg class="robot-icon" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-label="原始数据">
+                                    <rect x="8" y="10" width="32" height="28" rx="3" fill="#FFFCF3" stroke="#C8A044" stroke-width="1.5"/>
+                                    <text x="24" y="22" text-anchor="middle" font-size="7" fill="#17110A" font-weight="700">OHLC</text>
+                                    <text x="24" y="30" text-anchor="middle" font-size="6" fill="#7B7163">JSON</text>
+                                </svg>
+                                <div class="node-name">原始数据</div>
+                                <div class="node-data">开高低收 + 成交量</div>
+                            </div>
+
+                            <div class="flow-node">
+                                <svg class="robot-icon" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-label="K线生成">
+                                    <rect x="6" y="10" width="36" height="28" rx="4" fill="#FFF8E7" stroke="#C8A044" stroke-width="2"/>
+                                    <line x1="14" y1="32" x2="14" y2="20" stroke="#27AE60" stroke-width="1.5"/>
+                                    <rect x="12" y="22" width="4" height="6" fill="#27AE60"/>
+                                    <line x1="24" y1="34" x2="24" y2="14" stroke="#C0392B" stroke-width="1.5"/>
+                                    <rect x="22" y="20" width="4" height="8" fill="#C0392B"/>
+                                    <line x1="34" y1="30" x2="34" y2="22" stroke="#27AE60" stroke-width="1.5"/>
+                                    <rect x="32" y="24" width="4" height="4" fill="#27AE60"/>
+                                </svg>
+                                <div class="node-name">K 线生成</div>
+                                <div class="node-data">matplotlib 渲染</div>
+                            </div>
+                        </div>
+
+                        <div class="flow-arrow-down"><i class="fas fa-chevron-down"></i></div>
+
+                        {# 2) Three analysts in parallel #}
+                        {% set indicator_view = results.indicator_report|default('') %}
+                        {% set pattern_view = results.pattern_report|default('') %}
+                        {% set trend_view = results.trend_report|default('') %}
+                        <div class="flow-row analysts">
+                            <div class="flow-node analyst" title="RSI/MACD/ROC/Stoch/Williams">
+                                <svg class="robot-icon" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-label="指标 agent">
+                                    <rect x="8" y="14" width="32" height="24" rx="6" fill="#FFF8E7" stroke="#C8A044" stroke-width="2"/>
+                                    <rect x="14" y="6" width="20" height="10" rx="2" fill="#FFF8E7" stroke="#C8A044" stroke-width="2"/>
+                                    <line x1="20" y1="6" x2="20" y2="16" stroke="#C8A044" stroke-width="1.5"/>
+                                    <line x1="28" y1="6" x2="28" y2="16" stroke="#C8A044" stroke-width="1.5"/>
+                                    <circle cx="19" cy="26" r="2" fill="#C8A044"/>
+                                    <circle cx="29" cy="26" r="2" fill="#C8A044"/>
+                                    <rect x="17" y="30" width="14" height="2" fill="#C8A044"/>
+                                </svg>
+                                <div class="node-name">🤖 指标 Agent</div>
+                                <div class="node-data">RSI · MACD · ROC<br>Stoch · Williams</div>
+                                <div class="bubble {{ 'has-data' if indicator_view else '' }}">
+                                    {{ indicator_view[:50] ~ ('…' if indicator_view|length > 50 else '') if indicator_view else '等待输入…' }}
+                                </div>
+                            </div>
+
+                            <div class="flow-node analyst" title="K线形态识别">
+                                <svg class="robot-icon" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-label="形态 agent">
+                                    <rect x="8" y="14" width="32" height="24" rx="6" fill="#FFF8E7" stroke="#C8A044" stroke-width="2"/>
+                                    <rect x="14" y="6" width="20" height="10" rx="2" fill="#FFF8E7" stroke="#C8A044" stroke-width="2"/>
+                                    <line x1="20" y1="6" x2="20" y2="16" stroke="#C8A044" stroke-width="1.5"/>
+                                    <line x1="28" y1="6" x2="28" y2="16" stroke="#C8A044" stroke-width="1.5"/>
+                                    <circle cx="19" cy="26" r="2" fill="#C0392B"/>
+                                    <circle cx="29" cy="26" r="2" fill="#27AE60"/>
+                                    <path d="M17 32 Q24 28 31 32" stroke="#C8A044" stroke-width="1.5" fill="none"/>
+                                </svg>
+                                <div class="node-name">🤖 形态 Agent</div>
+                                <div class="node-data">K 线图像<br>双底/双顶/突破</div>
+                                <div class="bubble {{ 'has-data' if pattern_view else '' }}">
+                                    {{ pattern_view[:50] ~ ('…' if pattern_view|length > 50 else '') if pattern_view else '等待输入…' }}
+                                </div>
+                            </div>
+
+                            <div class="flow-node analyst" title="趋势方向 + 支撑阻力">
+                                <svg class="robot-icon" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-label="趋势 agent">
+                                    <rect x="8" y="14" width="32" height="24" rx="6" fill="#FFF8E7" stroke="#C8A044" stroke-width="2"/>
+                                    <rect x="14" y="6" width="20" height="10" rx="2" fill="#FFF8E7" stroke="#C8A044" stroke-width="2"/>
+                                    <line x1="20" y1="6" x2="20" y2="16" stroke="#C8A044" stroke-width="1.5"/>
+                                    <line x1="28" y1="6" x2="28" y2="16" stroke="#C8A044" stroke-width="1.5"/>
+                                    <circle cx="19" cy="26" r="2" fill="#4A6FA5"/>
+                                    <circle cx="29" cy="26" r="2" fill="#4A6FA5"/>
+                                    <path d="M14 33 L24 28 L34 33" stroke="#4A6FA5" stroke-width="1.5" fill="none"/>
+                                </svg>
+                                <div class="node-name">🤖 趋势 Agent</div>
+                                <div class="node-data">趋势线<br>支撑/阻力</div>
+                                <div class="bubble {{ 'has-data' if trend_view else '' }}">
+                                    {{ trend_view[:50] ~ ('…' if trend_view|length > 50 else '') if trend_view else '等待输入…' }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flow-arrow-down"><i class="fas fa-chevron-down"></i></div>
+
+                        {# 3) Cross-checker #}
+                        <div class="flow-row">
+                            <div></div>
+                            <div class="flow-node" title="三 agent 输出交叉校验">
+                                <svg class="robot-icon" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-label="共识校验">
+                                    <rect x="8" y="10" width="32" height="28" rx="4" fill="#FFF8E7" stroke="#C8A044" stroke-width="2"/>
+                                    <path d="M14 24 L21 31 L34 17" stroke="#2E7D32" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                                <div class="node-name">🔍 共识校验</div>
+                                <div class="node-data">consensus_score<br>core_view · conflicts</div>
+                                <div class="bubble has-data">
+                                    {%- set cv = results.core_view|default('') -%}
+                                    {{ cv[:50] ~ ('…' if cv|length > 50 else '') if cv else '等待三 agent 输入' }}
+                                </div>
+                            </div>
+                            <div></div>
+                        </div>
+
+                        <div class="flow-arrow-down"><i class="fas fa-chevron-down"></i></div>
+
+                        {# 4) Decision #}
+                        <div class="flow-row">
+                            <div></div>
+                            <div class="flow-node decision" title="综合所有信息输出最终交易决策">
+                                <svg class="robot-icon" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-label="决策 agent">
+                                    <circle cx="24" cy="24" r="18" fill="#FFF8E7" stroke="#17110A" stroke-width="2"/>
+                                    <circle cx="24" cy="24" r="12" fill="none" stroke="#17110A" stroke-width="1.5"/>
+                                    <path d="M24 16 L24 24 L30 28" stroke="#C8A044" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+                                </svg>
+                                <div class="node-name">🎯 决策 Agent</div>
+                                <div class="node-data">{{ direction if direction else '暂无决策' }}</div>
+                                <div class="bubble">
+                                    {%- set cv = results.core_view|default('') -%}
+                                    {{ cv[:50] ~ ('…' if cv|length > 50 else '') if cv else '等待共识' }}
+                                </div>
+                            </div>
+                            <div></div>
                         </div>
                     </div>
-                    <div class="pipeline-node analyst" title="识别 K 线形态（双底/双顶/突破等）">
-                        <svg class="robot-icon" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-label="形态 agent">
-                            <rect x="8" y="14" width="32" height="24" rx="6" fill="#FFF8E7" stroke="#C8A044" stroke-width="2"/>
-                            <rect x="14" y="6" width="20" height="10" rx="2" fill="#FFF8E7" stroke="#C8A044" stroke-width="2"/>
-                            <line x1="20" y1="6" x2="20" y2="16" stroke="#C8A044" stroke-width="1.5"/>
-                            <line x1="28" y1="6" x2="28" y2="16" stroke="#C8A044" stroke-width="1.5"/>
-                            <circle cx="19" cy="26" r="2" fill="#C0392B"/>
-                            <circle cx="29" cy="26" r="2" fill="#27AE60"/>
-                            <path d="M17 32 Q24 28 31 32" stroke="#C8A044" stroke-width="1.5" fill="none"/>
-                        </svg>
-                        <div class="node-name">🤖 形态 Agent</div>
-                        <div class="node-io">K 线图像<br>形态识别</div>
-                        <div class="core-view-bubble {{ 'has-data' if pattern_view else '' }}">
-                            {{ pattern_view[:48] + ('…' if pattern_view|length > 48 else '') if pattern_view else '暂无核心观点' }}
-                        </div>
-                    </div>
-                    <div class="pipeline-node analyst" title="判断趋势方向与支撑阻力">
-                        <svg class="robot-icon" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-label="趋势 agent">
-                            <rect x="8" y="14" width="32" height="24" rx="6" fill="#FFF8E7" stroke="#C8A044" stroke-width="2"/>
-                            <rect x="14" y="6" width="20" height="10" rx="2" fill="#FFF8E7" stroke="#C8A044" stroke-width="2"/>
-                            <line x1="20" y1="6" x2="20" y2="16" stroke="#C8A044" stroke-width="1.5"/>
-                            <line x1="28" y1="6" x2="28" y2="16" stroke="#C8A044" stroke-width="1.5"/>
-                            <circle cx="19" cy="26" r="2" fill="#4A6FA5"/>
-                            <circle cx="29" cy="26" r="2" fill="#4A6FA5"/>
-                            <path d="M14 33 L24 28 L34 33" stroke="#4A6FA5" stroke-width="1.5" fill="none"/>
-                        </svg>
-                        <div class="node-name">🤖 趋势 Agent</div>
-                        <div class="node-io">趋势线<br>支撑/阻力</div>
-                        <div class="core-view-bubble {{ 'has-data' if trend_view else '' }}">
-                            {{ trend_view[:48] + ('…' if trend_view|length > 48 else '') if trend_view else '暂无核心观点' }}
-                        </div>
-                    </div>
-                    <div class="pipeline-arrow"><i class="fas fa-arrow-right"></i></div>
 
-                    {# 4. Cross-Checker #}
-                    <div class="pipeline-node" title="三 agent 输出交叉校验，输出共识/冲突/核心观点">
-                        <svg class="robot-icon" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-label="交叉校验">
-                            <rect x="8" y="10" width="32" height="28" rx="4" fill="#FFF8E7" stroke="#C8A044" stroke-width="2"/>
-                            <path d="M14 24 L21 31 L34 17" stroke="#2E7D32" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-                        </svg>
-                        <div class="node-name">🔍 共识校验</div>
-                        <div class="node-io">consensus_score<br>core_view</div>
-                        <div class="core-view-bubble has-data">
-                            {%- set cv = results.core_view|default('') -%}
-                            {%- if cv -%}
-                                {{ cv[:48] }}{{ '…' if cv|length > 48 else '' }}
-                            {%- else -%}
-                                等待三 agent 输入
-                            {%- endif -%}
-                        </div>
-                    </div>
-                    <div class="pipeline-arrow"><i class="fas fa-arrow-right"></i></div>
-
-                    {# 5. Decision #}
-                    <div class="pipeline-node decision" title="综合所有信息，输出最终交易决策">
-                        <svg class="robot-icon" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-label="决策 agent">
-                            <circle cx="24" cy="24" r="18" fill="#FFF8E7" stroke="#17110A" stroke-width="2"/>
-                            <circle cx="24" cy="24" r="12" fill="none" stroke="#17110A" stroke-width="1.5"/>
-                            <path d="M24 16 L24 24 L30 28" stroke="#C8A044" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-                        </svg>
-                        <div class="node-name">🎯 决策 Agent</div>
-                        <div class="node-io">{{ direction if direction else '暂无决策' }}</div>
-                        <div class="core-view-bubble has-data">
-                            {%- set cv = results.core_view|default('') -%}
-                            {%- if cv -%}
-                                {{ cv[:48] }}{{ '…' if cv|length > 48 else '' }}
-                            {%- else -%}
-                                等待共识
-                            {%- endif -%}
-                        </div>
+                    <div class="data-format-strip">
+                        <span class="data-format-chip">OHLC JSON</span>
+                        <span class="data-format-chip">→ base64 PNG (matplotlib)</span>
+                        <span class="data-format-chip">→ 指标数值</span>
+                        <span class="data-format-chip">→ LLM 文本报告</span>
+                        <span class="data-format-chip">→ 共识 JSON</span>
+                        <span class="data-format-chip">→ 决策 JSON</span>
                     </div>
                 </div>
             </div>
 
-            {# === Trade params (auto-calc) === #}
-            <div class="trade-params">
-                <div class="trade-param-card entry">
-                    <div class="label">入场价</div>
-                    <div class="value">{{ results.entry_price if results.entry_price else '—' }}</div>
-                    {% if results.trade_params_auto %}<span class="auto-tag">自动</span>{% endif %}
-                </div>
-                <div class="trade-param-card stop">
-                    <div class="label">止损价</div>
-                    <div class="value">{{ results.stop_loss if results.stop_loss else '—' }}</div>
-                    {% if results.trade_params_auto %}<span class="auto-tag">自动</span>{% endif %}
-                </div>
-                <div class="trade-param-card target">
-                    <div class="label">止盈价</div>
-                    <div class="value">{{ results.take_profit if results.take_profit else '—' }}</div>
-                    {% if results.trade_params_auto %}<span class="auto-tag">自动</span>{% endif %}
-                </div>
-                <div class="trade-param-card rr">
-                    <div class="label">风险收益比</div>
-                    <div class="value">
-                        {% if results.risk_reward_ratio is not none %}{{ '%.2f'|format(results.risk_reward_ratio) }}{% else %}—{% endif %}
+            {# === Trade params === #}
+            <div class="section-card">
+                <h2 class="section-title"><i class="fas fa-bullseye"></i> 交易参数</h2>
+                <div class="section-sub">入场价、止损、止盈与风险收益比 · {{ '自动根据 ATR(14) 计算' if results.trade_params_auto else '由 AI 决策给出' }}</div>
+                <div class="trade-params">
+                    <div class="trade-param-card entry">
+                        <div class="label">入场价</div>
+                        <div class="value">{{ results.entry_price if results.entry_price else '—' }}</div>
+                        {% if results.trade_params_auto %}<span class="auto-tag">自动</span>{% endif %}
                     </div>
-                    {% if results.trade_params_auto %}<span class="auto-tag">自动</span>{% endif %}
+                    <div class="trade-param-card stop">
+                        <div class="label">止损价</div>
+                        <div class="value">{{ results.stop_loss if results.stop_loss else '—' }}</div>
+                        {% if results.trade_params_auto %}<span class="auto-tag">自动</span>{% endif %}
+                    </div>
+                    <div class="trade-param-card target">
+                        <div class="label">止盈价</div>
+                        <div class="value">{{ results.take_profit if results.take_profit else '—' }}</div>
+                        {% if results.trade_params_auto %}<span class="auto-tag">自动</span>{% endif %}
+                    </div>
+                    <div class="trade-param-card rr">
+                        <div class="label">风险收益比</div>
+                        <div class="value">
+                            {% if results.risk_reward_ratio is not none %}{{ '%.2f'|format(results.risk_reward_ratio) }}{% else %}—{% endif %}
+                        </div>
+                        {% if results.trade_params_auto %}<span class="auto-tag">自动</span>{% endif %}
+                    </div>
                 </div>
             </div>
 
             {# === Core-view propagation chain === #}
-            <div class="chain-section">
+            <div class="section-card">
                 <h2 class="section-title"><i class="fas fa-link"></i> 核心观点传递链</h2>
-                <div class="section-sub">每个智能体基于上一环节的输入，输出自己的"核心观点"，最终汇入决策</div>
+                <div class="section-sub">每个智能体基于上一环节输入产出核心观点，最终汇入决策</div>
                 <div class="chain">
                     <div class="chain-step">
                         <div class="step-label">数据输入</div>
@@ -750,19 +823,19 @@
                     <div class="chain-step {{ '' if indicator_view else 'empty' }}">
                         <div class="step-label">指标 Agent</div>
                         <div class="step-name">🤖 量化方向</div>
-                        <div class="step-text">{{ indicator_view[:60] + '…' if indicator_view and indicator_view|length > 60 else indicator_view if indicator_view else '暂无核心观点' }}</div>
+                        <div class="step-text">{{ indicator_view[:60] ~ ('…' if indicator_view|length > 60 else '') if indicator_view else '暂无核心观点' }}</div>
                     </div>
                     <div class="chain-step {{ '' if pattern_view else 'empty' }}">
                         <div class="step-label">形态 Agent</div>
                         <div class="step-name">🤖 K线形态</div>
-                        <div class="step-text">{{ pattern_view[:60] + '…' if pattern_view and pattern_view|length > 60 else pattern_view if pattern_view else '暂无核心观点' }}</div>
+                        <div class="step-text">{{ pattern_view[:60] ~ ('…' if pattern_view|length > 60 else '') if pattern_view else '暂无核心观点' }}</div>
                     </div>
                     <div class="chain-step {{ '' if trend_view else 'empty' }}">
                         <div class="step-label">趋势 Agent</div>
                         <div class="step-name">🤖 趋势研判</div>
-                        <div class="step-text">{{ trend_view[:60] + '…' if trend_view and trend_view|length > 60 else trend_view if trend_view else '暂无核心观点' }}</div>
+                        <div class="step-text">{{ trend_view[:60] ~ ('…' if trend_view|length > 60 else '') if trend_view else '暂无核心观点' }}</div>
                     </div>
-                    <div class="chain-step">
+                    <div class="chain-step final">
                         <div class="step-label">最终决策</div>
                         <div class="step-name">🎯 交易结论</div>
                         <div class="step-text">{{ results.core_view|default('暂无') }}</div>
@@ -770,8 +843,8 @@
                 </div>
             </div>
 
-            {# === Compact timeline === #}
-            <div class="timeline-section">
+            {# === Timeline === #}
+            <div class="section-card">
                 <h2 class="section-title"><i class="fas fa-stream"></i> 节点时间线</h2>
                 <ol class="timeline" id="process-timeline">
                     {% for ev in (results.process_events or [])[:10] %}
@@ -791,19 +864,19 @@
             </div>
 
             {# === Three agent reports (collapsed) === #}
-            <div class="reports-section">
+            <div class="section-card">
                 <h2 class="section-title"><i class="fas fa-layer-group"></i> 三智能体分析报告（可展开）</h2>
-                <div class="section-sub">默认折叠 · 点击展开查看完整分析</div>
+                <div class="section-sub">默认折叠 · 点击展开查看完整分析（已清除 markdown 标记）</div>
 
                 <details class="agent-detail">
                     <summary>
                         <svg class="robot-mini" viewBox="0 0 26 26" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="7" width="18" height="14" rx="3" fill="#FFF8E7" stroke="#C8A044"/><rect x="8" y="3" width="10" height="6" rx="1" fill="#FFF8E7" stroke="#C8A044"/><circle cx="10" cy="14" r="1.2" fill="#C8A044"/><circle cx="16" cy="14" r="1.2" fill="#C8A044"/></svg>
                         🤖 指标 Agent · RSI/MACD/ROC/Stoch/Williams
-                        <span class="report-summary">{{ (indicator_view[:60] + '…') if indicator_view and indicator_view|length > 60 else (indicator_view if indicator_view else '暂无报告') }}</span>
+                        <span class="report-summary">{{ (indicator_view[:60] ~ '…') if indicator_view and indicator_view|length > 60 else (indicator_view if indicator_view else '暂无报告') }}</span>
                     </summary>
                     <div class="body">
                         {% if results.indicator_report %}
-                        <div class="auto-beautify">{{ results.indicator_report }}</div>
+                        <div class="auto-beautify" data-report>{{ results.indicator_report }}</div>
                         {% else %}
                         <p class="text-muted mb-0">暂无技术指标报告。</p>
                         {% endif %}
@@ -814,14 +887,14 @@
                     <summary>
                         <svg class="robot-mini" viewBox="0 0 26 26" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="7" width="18" height="14" rx="3" fill="#FFF8E7" stroke="#C8A044"/><rect x="8" y="3" width="10" height="6" rx="1" fill="#FFF8E7" stroke="#C8A044"/><circle cx="10" cy="14" r="1.2" fill="#C0392B"/><circle cx="16" cy="14" r="1.2" fill="#27AE60"/></svg>
                         🤖 形态 Agent · K线形态识别
-                        <span class="report-summary">{{ (pattern_view[:60] + '…') if pattern_view and pattern_view|length > 60 else (pattern_view if pattern_view else '暂无报告') }}</span>
+                        <span class="report-summary">{{ (pattern_view[:60] ~ '…') if pattern_view and pattern_view|length > 60 else (pattern_view if pattern_view else '暂无报告') }}</span>
                     </summary>
                     <div class="body">
                         {% if results.pattern_chart %}
                             <img src="data:image/png;base64,{{ results.pattern_chart }}" alt="K线形态" class="analysis-image">
                         {% endif %}
                         {% if results.pattern_report %}
-                        <div class="auto-beautify">{{ results.pattern_report }}</div>
+                        <div class="auto-beautify" data-report>{{ results.pattern_report }}</div>
                         {% else %}
                         <p class="text-muted mb-0">暂无形态报告。</p>
                         {% endif %}
@@ -832,14 +905,14 @@
                     <summary>
                         <svg class="robot-mini" viewBox="0 0 26 26" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="7" width="18" height="14" rx="3" fill="#FFF8E7" stroke="#C8A044"/><rect x="8" y="3" width="10" height="6" rx="1" fill="#FFF8E7" stroke="#C8A044"/><circle cx="10" cy="14" r="1.2" fill="#4A6FA5"/><circle cx="16" cy="14" r="1.2" fill="#4A6FA5"/></svg>
                         🤖 趋势 Agent · 趋势方向 + 支撑阻力
-                        <span class="report-summary">{{ (trend_view[:60] + '…') if trend_view and trend_view|length > 60 else (trend_view if trend_view else '暂无报告') }}</span>
+                        <span class="report-summary">{{ (trend_view[:60] ~ '…') if trend_view and trend_view|length > 60 else (trend_view if trend_view else '暂无报告') }}</span>
                     </summary>
                     <div class="body">
                         {% if results.trend_chart %}
                             <img src="data:image/png;base64,{{ results.trend_chart }}" alt="趋势分析" class="analysis-image">
                         {% endif %}
                         {% if results.trend_report %}
-                        <div class="auto-beautify">{{ results.trend_report }}</div>
+                        <div class="auto-beautify" data-report>{{ results.trend_report }}</div>
                         {% else %}
                         <p class="text-muted mb-0">暂无趋势报告。</p>
                         {% endif %}
@@ -850,7 +923,7 @@
             {# === Full report CTA === #}
             <div class="full-report-cta">
                 <h3><i class="fas fa-file-alt"></i> 需要查看完整分析报告？</h3>
-                <p>包含三份完整报告全文、决策理由、共识校验、K 线图、趋势图，所有字段一览</p>
+                <p>包含三份完整报告全文、决策理由、共识校验、K 线图、趋势图，所有字段一览（老版本详尽界面）</p>
                 <a id="full-report-link-2" href="/output?view=full" class="btn-primary-cta">
                     <i class="fas fa-arrow-right"></i> 跳转完整分析报告
                 </a>
@@ -863,11 +936,29 @@
     </div>
 
     <script>
-        // Wire the export button to /api/export. The server returns
-        // application/pdf which we hand back to the user as a download.
-        // We read the current results from sessionStorage (set by
-        // demo_new.html after a successful analyze) so the user doesn't
-        // need to re-run the analysis.
+        (function () {
+            // Strip stray markdown artefacts the LLM leaves in reports:
+            //   - leading "#" / "##" / "###" on lines
+            //   - leading ">" on lines
+            //   - "**" / "__" emphasis marks
+            //   - stray "\n# " inside paragraphs
+            // We rewrite the text node so the displayed copy reads like
+            // normal Chinese prose.
+            function sanitizeText(s) {
+                if (!s) return '';
+                return s
+                    .replace(/^[ \t]*#{1,6}[ \t]+/gm, '')
+                    .replace(/^[ \t]*>[ \t]?/gm, '')
+                    .replace(/\*\*([^*]+)\*\*/g, '$1')
+                    .replace(/__([^_]+)__/g, '$1')
+                    .replace(/`([^`]+)`/g, '$1')
+                    .replace(/\*([^*\n]+)\*/g, '$1');
+            }
+            document.querySelectorAll('[data-report]').forEach(function (el) {
+                el.textContent = sanitizeText(el.textContent);
+            });
+        })();
+
         (function () {
             const btn = document.getElementById('export-pdf-btn');
             if (!btn) return;

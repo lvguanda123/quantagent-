@@ -1133,7 +1133,12 @@ def analyze():
 
         # Same treatment for risk-reward: derive from the (possibly
         # auto-filled) entry/stop/target if the LLM didn't return one.
+        # LLM sometimes returns 0 / 0.0 as a placeholder for "unknown" —
+        # treat those as missing so we recompute from the (possibly
+        # auto-filled) entry / stop / target.
         risk_reward_ratio = final_state.get("risk_reward_ratio")
+        if risk_reward_ratio in (0, 0.0, "", "0", "0.0"):
+            risk_reward_ratio = None
         if risk_reward_ratio is None and entry_price and stop_loss and take_profit:
             try:
                 if abs(float(entry_price) - float(stop_loss)) > 0:
@@ -1339,12 +1344,14 @@ def test_data():
 
 @app.route("/output")
 def output():
-    # Pick the output template that matches the application variant. The
-    # trader variant uses a K-line-first layout; the academic variant adds
-    # the process-timeline + PDF export + backtest surfaces.
+    # Pick the output template. The academic variant has two views:
+    #   1. the analysis-flow page (output_expert.html) — process/pipeline
+    #   2. the comprehensive full report (output.html) — the original
+    #      detailed view that the user has used since the single-product
+    #      days. The trader variant only ever uses output_trader.html.
     force_full = request.args.get("view") == "full"
-    if APP_VARIANT == "academic" and not force_full:
-        output_template = "output_expert.html"
+    if APP_VARIANT == "academic":
+        output_template = "output.html" if force_full else "output_expert.html"
     else:
         output_template = "output_trader.html"
 

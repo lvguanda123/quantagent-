@@ -3556,6 +3556,24 @@
                     }
                     updateReturnReportButton();
                 }
+                // The /output route renders an empty stub if we navigate
+                // there without a ?key= (the full payload is too large for
+                // a query string). Stash the result on the server side and
+                // follow the redirect the prepare endpoint gives us.
+                if (data.full_results) {
+                    stopAnalysisLoading(true);
+                    fetch('/api/output/prepare', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data.full_results),
+                    })
+                        .then(r => r.ok ? r.json() : null)
+                        .then(prep => {
+                            window.location.href = prep && prep.redirect ? prep.redirect : '/output';
+                        })
+                        .catch(() => { window.location.href = '/output'; });
+                    return;
+                }
                 stopAnalysisLoading(true);
                 window.location.href = data.redirect;
                 return;
