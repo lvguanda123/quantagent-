@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync, readdirSync, unlinkSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -108,7 +108,6 @@ function injectWebView2Loader() {
   }
   const bundleDir = join(releaseDir, "bundle/nsis");
   if (existsSync(bundleDir)) {
-    const { readdirSync, unlinkSync } = require("node:fs");
     for (const name of readdirSync(bundleDir)) {
       if (name.endsWith("-setup.exe")) {
         unlinkSync(join(bundleDir, name));

@@ -963,6 +963,64 @@ def build_trend_fallback_report(final_state: Dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _auto_calc_trade_params(final_state: Dict[str, Any], decision_direction: str) -> Dict[str, Any]:
+    """Compute entry / stop-loss / take-profit / risk-reward when the LLM
+    didn't supply them. Uses last close as entry, recent N-bar true range
+    to size the stop, and a default 2.0 risk-reward ratio for the target.
+
+    The function never overrides values the LLM already returned — call
+    it with the existing parsed values and merge only the missing keys.
+    """
+    kline = final_state.get("kline_data") or {}
+    highs = kline.get("High") or kline.get("high") or []
+    lows = kline.get("Low") or kline.get("low") or []
+    closes = kline.get("Close") or kline.get("close") or []
+    try:
+        h = [float(v) for v in highs if v is not None]
+        l = [float(v) for v in lows if v is not None]
+        c = [float(v) for v in closes if v is not None]
+    except (TypeError, ValueError):
+        return {"entry_price": None, "stop_loss": None, "take_profit": None, "risk_reward_ratio": None, "auto_calc": False}
+
+    if not c:
+        return {"entry_price": None, "stop_loss": None, "take_profit": None, "risk_reward_ratio": None, "auto_calc": False}
+
+    entry = round(c[-1], 4)
+    # True range over the last 14 bars (or whatever's available). Fall back
+    # to 2% of price if we don't have enough data for a meaningful range.
+    n = min(14, len(c))
+    if n >= 2 and len(h) >= n and len(l) >= n:
+        trs = [max(h[i] - l[i], abs(h[i] - c[i - 1]), abs(l[i] - c[i - 1])) for i in range(-n, 0)]
+        atr = sum(trs) / len(trs) if trs else entry * 0.02
+    else:
+        atr = entry * 0.02
+    # Stop at 1.5 ATR, target at 2x the stop distance (2:1 RR).
+    stop_distance = round(atr * 1.5, 4)
+    target_distance = round(stop_distance * 2.0, 4)
+
+    direction = (decision_direction or "").strip()
+    is_long = any(k in direction for k in ("做多", "LONG", "long", "买入"))
+    is_short = any(k in direction for k in ("做空", "SHORT", "short", "卖出"))
+    if is_long:
+        stop = round(entry - stop_distance, 4)
+        target = round(entry + target_distance, 4)
+    elif is_short:
+        stop = round(entry + stop_distance, 4)
+        target = round(entry - target_distance, 4)
+    else:
+        # 观望 / unknown — still emit symmetric levels so the UI is populated.
+        stop = round(entry - stop_distance, 4)
+        target = round(entry + target_distance, 4)
+    rr = round(target_distance / stop_distance, 2) if stop_distance else None
+    return {
+        "entry_price": entry,
+        "stop_loss": stop,
+        "take_profit": target,
+        "risk_reward_ratio": rr,
+        "auto_calc": True,
+    }
+
+
 @app.route("/")
 def index():
     return render_template(
@@ -1048,6 +1106,44 @@ def analyze():
             entry_price = parsed.get("入场价格", parsed.get("entry_price"))
             stop_loss = parsed.get("止损价格", parsed.get("stop_loss"))
             take_profit = parsed.get("止盈价格", parsed.get("take_profit"))
+            # The LLM sometimes returns 0 / 0.0 as a placeholder for "unknown".
+            # Treat those the same as missing so the auto-calc kicks in.
+            if entry_price in (0, 0.0, "", "0", "0.0"):
+                entry_price = None
+            if stop_loss in (0, 0.0, "", "0", "0.0"):
+                stop_loss = None
+            if take_profit in (0, 0.0, "", "0", "0.0"):
+                take_profit = None
+
+        # Auto-fill missing trade params from the OHLC data so the UI
+        # never shows "—" when there's enough price history to compute
+        # a sensible level. The flag `auto_calc: True` is surfaced to the
+        # template so it can mark the values as derived.
+        trade_params_auto = False
+        if entry_price is None or stop_loss is None or take_profit is None:
+            auto = _auto_calc_trade_params(final_state, decision_direction)
+            if auto.get("auto_calc"):
+                trade_params_auto = True
+                if entry_price is None:
+                    entry_price = auto["entry_price"]
+                if stop_loss is None:
+                    stop_loss = auto["stop_loss"]
+                if take_profit is None:
+                    take_profit = auto["take_profit"]
+
+        # Same treatment for risk-reward: derive from the (possibly
+        # auto-filled) entry/stop/target if the LLM didn't return one.
+        risk_reward_ratio = final_state.get("risk_reward_ratio")
+        if risk_reward_ratio is None and entry_price and stop_loss and take_profit:
+            try:
+                if abs(float(entry_price) - float(stop_loss)) > 0:
+                    risk_reward_ratio = round(
+                        abs(float(take_profit) - float(entry_price))
+                        / abs(float(entry_price) - float(stop_loss)),
+                        2,
+                    )
+            except (TypeError, ValueError, ZeroDivisionError):
+                risk_reward_ratio = None
 
         indicator_report = final_state.get("indicator_report", "")
         trend_report = final_state.get("trend_report", "")
@@ -1103,7 +1199,8 @@ def analyze():
             # Decision Maker structured outputs
             "justification": final_state.get("justification", "") or "",
             "forecast_horizon": final_state.get("forecast_horizon", "") or "",
-            "risk_reward_ratio": final_state.get("risk_reward_ratio"),
+            "risk_reward_ratio": risk_reward_ratio,
+            "trade_params_auto": trade_params_auto,
             "decision": final_state.get("decision", "") or decision_direction,
             # Process event stream (academic output template)
             "process_events": process_events,
@@ -1245,7 +1342,8 @@ def output():
     # Pick the output template that matches the application variant. The
     # trader variant uses a K-line-first layout; the academic variant adds
     # the process-timeline + PDF export + backtest surfaces.
-    if APP_VARIANT == "academic":
+    force_full = request.args.get("view") == "full"
+    if APP_VARIANT == "academic" and not force_full:
         output_template = "output_expert.html"
     else:
         output_template = "output_trader.html"
@@ -1300,6 +1398,7 @@ def output():
         "justification": "",
         "forecast_horizon": "",
         "risk_reward_ratio": None,
+        "trade_params_auto": False,
         "process_events": [],
         "mode": APP_VARIANT,
     }

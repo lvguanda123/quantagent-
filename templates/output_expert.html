@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QuantAgent - 专家分析报告（高校版）</title>
+    <title>QuantAgent - 分析流程（高校版）</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script>
@@ -33,6 +33,9 @@
             --bull: #C0392B;
             --bear: #27AE60;
             --neutral: #6B7280;
+            --robot-bg: #FFF8E7;
+            --robot-border: #C8A044;
+            --pipeline-arrow: #C8A044;
         }
         :root[data-theme="dark"] {
             --page-bg: #090806;
@@ -48,6 +51,7 @@
             --text-primary: #F7F0DF;
             --text-secondary: #D9C9A7;
             --text-muted: #A89772;
+            --robot-bg: #2A1F0F;
         }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -88,6 +92,12 @@
         }
         .btn-academic:hover { background: #B08930; color: #fff; }
         .btn-academic:disabled { background: var(--gray-500); cursor: not-allowed; }
+        .btn-ghost {
+            background: rgba(255, 255, 255, 0.12);
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+        }
+        .btn-ghost:hover { background: rgba(255, 255, 255, 0.22); color: #fff; }
 
         .main-container {
             background: var(--white);
@@ -99,42 +109,44 @@
         }
         .results-section { padding: 1.25rem; }
 
-        /* Two-column layout */
-        .expert-grid {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
-            gap: 1.25rem;
-        }
-        @media (max-width: 1024px) {
-            .expert-grid { grid-template-columns: 1fr; }
-        }
-
-        /* Panels */
-        .panel {
-            background: var(--white);
-            border: 2px solid var(--gray-200);
-            border-radius: 16px;
-            padding: 1.1rem;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-            margin-bottom: 1rem;
-        }
-        .panel-title {
-            color: var(--etrade-purple);
-            font-weight: 600;
-            font-size: 1.15rem;
-            margin: 0 0 0.85rem 0;
+        /* Decision bar */
+        .decision-bar {
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+            background: linear-gradient(135deg, #FFF8E7 0%, #fff 100%);
+            border: 2px solid var(--etrade-purple-light);
+            border-radius: 16px;
+            padding: 1rem 1.25rem;
+            margin-bottom: 1.25rem;
         }
-        .panel-title i { color: var(--etrade-purple-light); }
+        :root[data-theme="dark"] .decision-bar {
+            background: linear-gradient(135deg, #2A1F0F 0%, var(--white) 100%);
+        }
+        .decision-bar .core-view {
+            flex: 1;
+            min-width: 240px;
+            font-size: 1.05rem;
+            line-height: 1.5;
+        }
+        .decision-bar .core-view strong { color: var(--etrade-purple); }
+        .meta-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            background: var(--gray-50);
+            padding: 0.3rem 0.8rem;
+            border-radius: 999px;
+            font-size: 0.85rem;
+        }
 
         /* Decision badge */
         .decision-badge {
             display: inline-flex;
             align-items: center;
             gap: 0.4rem;
-            padding: 0.4rem 1rem;
+            padding: 0.45rem 1.05rem;
             border-radius: 999px;
             font-size: 1rem;
             font-weight: 700;
@@ -144,40 +156,231 @@
         .decision-badge.decision-short { background: var(--bear); }
         .decision-badge.decision-neutral { background: var(--neutral); }
 
-        /* Consensus card */
-        .consensus-card {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            background: var(--gray-50);
-            border-radius: 10px;
-            padding: 0.85rem 1rem;
+        /* === PIPELINE (HERO) === */
+        .pipeline-section {
+            background: linear-gradient(180deg, var(--robot-bg) 0%, var(--white) 100%);
+            border: 2px solid var(--etrade-purple-light);
+            border-radius: 18px;
+            padding: 1.5rem 1.25rem 1.25rem 1.25rem;
+            margin-bottom: 1.25rem;
         }
-        .consensus-card .score {
-            font-size: 1.6rem;
+        :root[data-theme="dark"] .pipeline-section {
+            background: linear-gradient(180deg, var(--robot-bg) 0%, var(--white) 100%);
+        }
+        .pipeline-section .section-title {
+            font-size: 1.15rem;
             font-weight: 700;
             color: var(--etrade-purple);
-            min-width: 60px;
+            margin: 0 0 0.25rem 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
         }
-        .consensus-card .bar {
-            flex: 1;
-            height: 8px;
-            background: var(--gray-200);
-            border-radius: 4px;
-            overflow: hidden;
+        .pipeline-section .section-sub {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 1.25rem;
         }
-        .consensus-card .bar > span {
+        .pipeline {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 0.5rem;
+            align-items: stretch;
+        }
+        @media (max-width: 1100px) {
+            .pipeline { grid-template-columns: repeat(3, 1fr); }
+        }
+        .pipeline-node {
+            background: var(--white);
+            border: 1.5px solid var(--gray-200);
+            border-radius: 12px;
+            padding: 0.75rem 0.6rem;
+            text-align: center;
+            position: relative;
+            transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+            cursor: default;
+        }
+        .pipeline-node:hover {
+            transform: translateY(-3px);
+            border-color: var(--etrade-purple-light);
+            box-shadow: 0 8px 18px rgba(200, 160, 68, 0.18);
+        }
+        .pipeline-node .robot-icon {
+            width: 48px;
+            height: 48px;
+            margin: 0 auto 0.4rem auto;
             display: block;
-            height: 100%;
-            background: linear-gradient(90deg, #C8A044 0%, #2E7D32 100%);
+        }
+        .pipeline-node .node-name {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--etrade-purple);
+            margin-bottom: 0.2rem;
+        }
+        .pipeline-node .node-io {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            line-height: 1.3;
+        }
+        .pipeline-node.analyst { border-color: var(--etrade-purple-light); }
+        .pipeline-node.decision { background: linear-gradient(135deg, #FFF8E7, #fff); border-color: var(--etrade-purple); border-width: 2px; }
+        :root[data-theme="dark"] .pipeline-node.decision { background: linear-gradient(135deg, #2A1F0F, var(--white)); }
+        .pipeline-node .core-view-bubble {
+            margin-top: 0.4rem;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            background: var(--gray-50);
+            border-radius: 6px;
+            padding: 0.35rem 0.4rem;
+            line-height: 1.35;
+            min-height: 36px;
+        }
+        .pipeline-node .core-view-bubble.has-data {
+            color: var(--etrade-purple);
+            background: #FFF8E7;
+            font-weight: 500;
+        }
+        :root[data-theme="dark"] .pipeline-node .core-view-bubble.has-data {
+            background: #3D2C0F;
+        }
+        .pipeline-arrow {
+            align-self: center;
+            color: var(--pipeline-arrow);
+            font-size: 1.1rem;
+            text-align: center;
+        }
+        @media (max-width: 1100px) {
+            .pipeline-arrow { display: none; }
         }
 
-        /* Process timeline */
+        /* === TRADE PARAMS === */
+        .trade-params {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.75rem;
+            margin-bottom: 1.25rem;
+        }
+        @media (max-width: 768px) {
+            .trade-params { grid-template-columns: repeat(2, 1fr); }
+        }
+        .trade-param-card {
+            background: var(--white);
+            border: 1.5px solid var(--gray-200);
+            border-left: 5px solid var(--etrade-purple-light);
+            padding: 0.85rem 1rem;
+            border-radius: 12px;
+            position: relative;
+        }
+        .trade-param-card.entry   { border-left-color: #C8A044; }
+        .trade-param-card.stop    { border-left-color: #C0392B; }
+        .trade-param-card.target  { border-left-color: #2E7D32; }
+        .trade-param-card.rr      { border-left-color: #4A6FA5; }
+        .trade-param-card .label {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .trade-param-card .value {
+            font-size: 1.4rem;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+            margin-top: 0.2rem;
+            color: var(--text-primary);
+        }
+        .trade-param-card .auto-tag {
+            position: absolute;
+            top: 0.55rem;
+            right: 0.55rem;
+            font-size: 0.65rem;
+            background: #FFF8E7;
+            color: #6B4400;
+            padding: 0.1rem 0.45rem;
+            border-radius: 999px;
+            border: 1px solid #C8A044;
+        }
+        :root[data-theme="dark"] .trade-param-card .auto-tag {
+            background: #3D2C0F;
+            color: #FFD28A;
+        }
+
+        /* === CORE-VIEW PROPAGATION CHAIN === */
+        .chain-section {
+            background: var(--white);
+            border: 2px solid var(--gray-200);
+            border-radius: 16px;
+            padding: 1.25rem;
+            margin-bottom: 1.25rem;
+        }
+        .chain-section .section-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--etrade-purple);
+            margin: 0 0 0.25rem 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .chain-section .section-sub {
+            font-size: 0.83rem;
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+        }
+        .chain {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 0.5rem;
+        }
+        @media (max-width: 1024px) { .chain { grid-template-columns: repeat(2, 1fr); } }
+        .chain-step {
+            background: var(--gray-50);
+            border: 1.5px solid var(--gray-200);
+            border-radius: 10px;
+            padding: 0.7rem 0.6rem;
+            position: relative;
+        }
+        .chain-step .step-label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.25rem;
+        }
+        .chain-step .step-name {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--etrade-purple);
+            margin-bottom: 0.35rem;
+        }
+        .chain-step .step-text {
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+        .chain-step.empty .step-text { color: var(--text-muted); font-style: italic; }
+
+        /* === TIMELINE (compact) === */
+        .timeline-section {
+            background: var(--white);
+            border: 2px solid var(--gray-200);
+            border-radius: 16px;
+            padding: 1.25rem;
+            margin-bottom: 1.25rem;
+        }
+        .timeline-section .section-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--etrade-purple);
+            margin: 0 0 0.75rem 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
         .timeline { list-style: none; padding: 0; margin: 0; position: relative; }
         .timeline::before {
             content: "";
             position: absolute;
-            left: 14px;
+            left: 10px;
             top: 0;
             bottom: 0;
             width: 2px;
@@ -185,15 +388,16 @@
         }
         .timeline li {
             position: relative;
-            padding: 0.4rem 0 0.4rem 2.5rem;
-            margin-bottom: 0.4rem;
+            padding: 0.3rem 0 0.3rem 2rem;
+            margin-bottom: 0.2rem;
+            font-size: 0.88rem;
         }
         .timeline li .dot {
             position: absolute;
-            left: 8px;
-            top: 0.6rem;
-            width: 14px;
-            height: 14px;
+            left: 5px;
+            top: 0.55rem;
+            width: 12px;
+            height: 12px;
             border-radius: 50%;
             background: var(--gray-300);
             border: 2px solid var(--white);
@@ -203,90 +407,33 @@
         .timeline li.end .dot { background: #2E7D32; }
         .timeline li.error .dot { background: #C0392B; }
         .timeline li .meta {
-            font-size: 0.8rem;
+            font-size: 0.72rem;
             color: var(--text-muted);
         }
-        .timeline li .node { font-weight: 600; }
-        .timeline li .payload {
-            font-size: 0.85rem;
-            color: var(--text-secondary);
-            margin-top: 0.15rem;
-        }
+        .timeline li .node { font-weight: 600; color: var(--etrade-purple); }
 
-        /* SVG data-flow diagram */
-        .data-flow-svg { width: 100%; height: auto; display: block; }
-        .data-flow-svg .node-box {
-            fill: var(--white);
-            stroke: var(--etrade-purple-light);
-            stroke-width: 1.5;
+        /* === AGENT REPORT CARDS (collapsed) === */
+        .reports-section {
+            background: var(--white);
+            border: 2px solid var(--gray-200);
+            border-radius: 16px;
+            padding: 1.25rem;
+            margin-bottom: 1.25rem;
         }
-        :root[data-theme="dark"] .data-flow-svg .node-box {
-            fill: var(--gray-50);
-        }
-        .data-flow-svg .node-label {
-            font-family: 'Segoe UI', sans-serif;
-            font-size: 12px;
-            fill: var(--text-primary);
-            text-anchor: middle;
-            dominant-baseline: middle;
-        }
-        .data-flow-svg .arrow {
-            stroke: var(--text-muted);
-            stroke-width: 1.5;
-            fill: none;
-        }
-
-        /* Agent interaction list */
-        .agent-flow-list { list-style: none; padding: 0; margin: 0; }
-        .agent-flow-list li {
-            padding: 0.45rem 0.6rem;
-            border-left: 3px solid var(--etrade-purple-light);
-            background: var(--gray-50);
-            border-radius: 0 6px 6px 0;
-            margin-bottom: 0.4rem;
-            font-size: 0.9rem;
-        }
-        .agent-flow-list li strong { color: var(--etrade-purple); }
-
-        /* Stats row */
-        .stats-row { display: flex; gap: 0.75rem; flex-wrap: wrap; }
-        .stats-card {
-            flex: 1 1 110px;
-            background: var(--gray-50);
-            border-radius: 8px;
-            padding: 0.7rem 0.85rem;
-            text-align: center;
-        }
-        .stats-card .stats-number { font-size: 1.2rem; font-weight: 700; }
-        .stats-card .stats-label { color: var(--text-muted); font-size: 0.8rem; }
-
-        /* Trade params */
-        .trade-params-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 0.7rem;
-        }
-        @media (max-width: 768px) {
-            .trade-params-grid { grid-template-columns: repeat(2, 1fr); }
-        }
-        .trade-param-card {
-            background: var(--gray-50);
-            border-left: 4px solid var(--etrade-purple-light);
-            padding: 0.7rem 0.85rem;
-            border-radius: 8px;
-        }
-        .trade-param-card .label { font-size: 0.8rem; color: var(--text-muted); }
-        .trade-param-card .value {
-            font-size: 1.2rem;
+        .reports-section .section-title {
+            font-size: 1.1rem;
             font-weight: 700;
-            font-family: 'Courier New', monospace;
+            color: var(--etrade-purple);
+            margin: 0 0 0.5rem 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
         }
-        .trade-param-card.entry   { border-left-color: #C8A044; }
-        .trade-param-card.stop    { border-left-color: #C0392B; }
-        .trade-param-card.target  { border-left-color: #2E7D32; }
-        .trade-param-card.rr      { border-left-color: #4A6FA5; }
-
-        /* Collapsible details */
+        .reports-section .section-sub {
+            font-size: 0.83rem;
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
+        }
         .agent-detail {
             border: 1px solid var(--gray-200);
             border-radius: 12px;
@@ -312,296 +459,404 @@
             color: var(--text-muted);
         }
         .agent-detail[open] > summary::after { transform: rotate(180deg); }
-        .agent-detail > summary i {
-            color: var(--etrade-purple-light);
-            width: 1.1rem;
-            text-align: center;
+        .agent-detail > summary .robot-mini {
+            width: 26px;
+            height: 26px;
+            flex-shrink: 0;
+        }
+        .agent-detail > summary .report-summary {
+            font-weight: 400;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-left: 0.5rem;
+            flex: 1;
         }
         .agent-detail > .body {
             padding: 0.5rem 0.9rem 0.9rem 0.9rem;
             border-top: 1px solid var(--gray-100);
         }
-
-        /* Auto-beautify */
         .auto-beautify { line-height: 1.8; color: var(--gray-700); }
         .auto-beautify p { margin-bottom: 0.65rem; }
         .auto-beautify strong { color: var(--etrade-purple); }
-        .auto-beautify pre {
-            background: var(--gray-50);
-            padding: 0.85rem;
+        .analysis-image {
+            max-width: 100%;
+            height: auto;
             border-radius: 8px;
-            overflow-x: auto;
-            font-family: 'Courier New', monospace;
-            font-size: 0.9rem;
-            white-space: pre-wrap;
-            word-wrap: break-word;
+            display: block;
+            margin-bottom: 0.75rem;
         }
-        .analysis-image { max-width: 100%; height: auto; border-radius: 8px; display: block; }
-        .conflict-warn {
-            background: #FFF3CD;
-            border-left: 4px solid #FFB300;
-            padding: 0.7rem 0.9rem;
-            border-radius: 8px;
-            color: #6B4400;
-            margin-top: 0.5rem;
+
+        /* === FULL REPORT CTA === */
+        .full-report-cta {
+            text-align: center;
+            padding: 1.5rem 1rem;
+            background: linear-gradient(135deg, #FFF8E7 0%, #fff 100%);
+            border: 2px dashed var(--etrade-purple-light);
+            border-radius: 16px;
+            margin-bottom: 1rem;
+        }
+        :root[data-theme="dark"] .full-report-cta {
+            background: linear-gradient(135deg, #2A1F0F 0%, var(--white) 100%);
+        }
+        .full-report-cta h3 {
+            color: var(--etrade-purple);
+            margin: 0 0 0.4rem 0;
+            font-size: 1.15rem;
+        }
+        .full-report-cta p {
+            color: var(--text-secondary);
+            margin: 0 0 0.85rem 0;
             font-size: 0.9rem;
         }
-        :root[data-theme="dark"] .conflict-warn { background: #3D2C0F; color: #FFD28A; }
+        .btn-primary-cta {
+            background: var(--etrade-purple);
+            color: #fff;
+            border: none;
+            padding: 0.7rem 1.5rem;
+            border-radius: 999px;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 1rem;
+        }
+        .btn-primary-cta:hover { background: #000; color: #fff; }
+
+        .back-row { display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; }
         .back-link {
             display: inline-block;
-            margin-top: 1rem;
             color: var(--etrade-purple-light);
             text-decoration: none;
             font-weight: 600;
         }
         .back-link:hover { text-decoration: underline; }
-        .back-row { display: flex; justify-content: space-between; align-items: center; }
     </style>
 </head>
 <body>
     <div class="header">
         <div>
-            <h1><i class="fas fa-graduation-cap"></i> 专家分析报告（高校版）</h1>
-            <div class="subtitle">过程可视化 · 三 agent 共识校验 · 可导出 PDF · 支持回测</div>
+            <h1><i class="fas fa-robot"></i> 分析流程（高校版）</h1>
+            <div class="subtitle">从原始数据到最终交易结论 · 智能体协作可视化</div>
         </div>
         <div class="header-actions">
-            <button id="export-pdf-btn" class="btn-academic" type="button">
+            <a id="full-report-link" href="/output?view=full" class="btn-academic">
+                <i class="fas fa-file-alt"></i> 查看完整分析报告
+            </a>
+            <button id="export-pdf-btn" class="btn-ghost" style="background: rgba(255,255,255,0.12); color:#fff; border:1px solid rgba(255,255,255,0.4); padding:0.55rem 1.1rem; border-radius:8px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:0.4rem;" type="button">
                 <i class="fas fa-file-pdf"></i> 导出 PDF
             </button>
-            <a href="/" class="btn-academic"><i class="fas fa-home"></i> 首页</a>
+            <a href="/" class="btn-ghost" style="background: rgba(255,255,255,0.12); color:#fff; border:1px solid rgba(255,255,255,0.4); padding:0.55rem 1.1rem; border-radius:8px; font-weight:600; text-decoration:none; display:inline-flex; align-items:center; gap:0.4rem;">
+                <i class="fas fa-home"></i> 首页
+            </a>
         </div>
     </div>
 
     <div class="main-container">
         <div class="results-section">
 
-            <!-- Top decision strip -->
-            <div class="panel">
-                <div style="display:flex; align-items:center; flex-wrap:wrap; gap:1rem;">
-                    {% set direction = (results.decision_direction|default(''))|string|trim %}
-                    {% if direction and ('做多' in direction or 'LONG' in direction|upper) %}
-                        <span class="decision-badge decision-long"><i class="fas fa-arrow-trend-up"></i> 做多 LONG</span>
-                    {% elif direction and ('做空' in direction or 'SHORT' in direction|upper) %}
-                        <span class="decision-badge decision-short"><i class="fas fa-arrow-trend-down"></i> 做空 SHORT</span>
-                    {% elif direction and ('观望' in direction or 'HOLD' in direction|upper) %}
-                        <span class="decision-badge decision-neutral"><i class="fas fa-minus"></i> 观望 HOLD</span>
-                    {% else %}
-                        <span class="decision-badge decision-neutral"><i class="fas fa-minus"></i> 暂无决策</span>
-                    {% endif %}
-                    <div style="flex:1; min-width:240px;">
-                        <strong style="color:var(--etrade-purple);">核心观点：</strong>
-                        {{ results.core_view|default('暂无') }}
+            {# === Decision bar === #}
+            <div class="decision-bar">
+                {% set direction = (results.decision_direction|default(''))|string|trim %}
+                {% if direction and ('做多' in direction or 'LONG' in direction|upper) %}
+                    <span class="decision-badge decision-long"><i class="fas fa-arrow-trend-up"></i> 做多 LONG</span>
+                {% elif direction and ('做空' in direction or 'SHORT' in direction|upper) %}
+                    <span class="decision-badge decision-short"><i class="fas fa-arrow-trend-down"></i> 做空 SHORT</span>
+                {% elif direction and ('观望' in direction or 'HOLD' in direction|upper) %}
+                    <span class="decision-badge decision-neutral"><i class="fas fa-minus"></i> 观望 HOLD</span>
+                {% else %}
+                    <span class="decision-badge decision-neutral"><i class="fas fa-minus"></i> 暂无决策</span>
+                {% endif %}
+                <div class="core-view">
+                    <strong>核心观点：</strong>
+                    {{ results.core_view|default('暂无') }}
+                </div>
+                <span class="meta-chip" title="三 agent 共识度">
+                    <i class="fas fa-handshake"></i> 共识 {{ ((results.consensus_score|default(0.5)) * 100) | round(0) | int }}%
+                </span>
+                {% if results.forecast_horizon %}
+                <span class="meta-chip">
+                    <i class="far fa-clock"></i> 预测 {{ results.forecast_horizon }}
+                </span>
+                {% endif %}
+            </div>
+
+            {# === HERO: Pipeline diagram === #}
+            <div class="pipeline-section">
+                <h2 class="section-title"><i class="fas fa-sitemap"></i> 数据流转与多智能体协作</h2>
+                <div class="section-sub">从 {{ results.data_source|default('akshare') }} 拉取 OHLC → 渲染 K 线 → 并行 3 个分析 agent → 共识校验 → 最终决策</div>
+
+                <div class="pipeline">
+                    {# 1. Data source #}
+                    <div class="pipeline-node">
+                        <svg class="robot-icon" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-label="数据源">
+                            <rect x="6" y="10" width="36" height="28" rx="4" fill="#FFF8E7" stroke="#C8A044" stroke-width="2"/>
+                            <path d="M6 18 L42 18" stroke="#C8A044" stroke-width="1.5"/>
+                            <circle cx="13" cy="14" r="1.5" fill="#C0392B"/>
+                            <circle cx="18" cy="14" r="1.5" fill="#C8A044"/>
+                            <text x="24" y="34" text-anchor="middle" font-size="10" fill="#17110A" font-weight="600">DATA</text>
+                        </svg>
+                        <div class="node-name">数据源</div>
+                        <div class="node-io">{{ results.data_source|default('akshare') }}<br>OHLC JSON</div>
                     </div>
-                    {% if results.forecast_horizon %}
-                    <span class="meta-chip" style="background:var(--gray-50); padding:0.3rem 0.8rem; border-radius:999px; font-size:0.85rem;">
-                        <i class="far fa-clock"></i> 预测 {{ results.forecast_horizon }}
-                    </span>
-                    {% endif %}
+                    <div class="pipeline-arrow"><i class="fas fa-arrow-right"></i></div>
+
+                    {# 2. K-line generator #}
+                    <div class="pipeline-node">
+                        <svg class="robot-icon" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-label="K线生成">
+                            <rect x="6" y="10" width="36" height="28" rx="4" fill="#FFF8E7" stroke="#C8A044" stroke-width="2"/>
+                            <line x1="14" y1="32" x2="14" y2="20" stroke="#27AE60" stroke-width="1.5"/>
+                            <rect x="12" y="22" width="4" height="6" fill="#27AE60"/>
+                            <line x1="24" y1="34" x2="24" y2="14" stroke="#C0392B" stroke-width="1.5"/>
+                            <rect x="22" y="20" width="4" height="8" fill="#C0392B"/>
+                            <line x1="34" y1="30" x2="34" y2="22" stroke="#27AE60" stroke-width="1.5"/>
+                            <rect x="32" y="24" width="4" height="4" fill="#27AE60"/>
+                        </svg>
+                        <div class="node-name">K 线生成</div>
+                        <div class="node-io">matplotlib<br>base64 PNG</div>
+                    </div>
+                    <div class="pipeline-arrow"><i class="fas fa-arrow-right"></i></div>
+
+                    {# 3. Three analysts #}
+                    {% set indicator_view = results.indicator_report|default('') %}
+                    {% set pattern_view = results.pattern_report|default('') %}
+                    {% set trend_view = results.trend_report|default('') %}
+                    <div class="pipeline-node analyst" title="基于 RSI/MACD/ROC/Stoch/Williams 指标">
+                        <svg class="robot-icon" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-label="指标 agent">
+                            <rect x="8" y="14" width="32" height="24" rx="6" fill="#FFF8E7" stroke="#C8A044" stroke-width="2"/>
+                            <rect x="14" y="6" width="20" height="10" rx="2" fill="#FFF8E7" stroke="#C8A044" stroke-width="2"/>
+                            <line x1="20" y1="6" x2="20" y2="16" stroke="#C8A044" stroke-width="1.5"/>
+                            <line x1="28" y1="6" x2="28" y2="16" stroke="#C8A044" stroke-width="1.5"/>
+                            <circle cx="19" cy="26" r="2" fill="#C8A044"/>
+                            <circle cx="29" cy="26" r="2" fill="#C8A044"/>
+                            <rect x="17" y="30" width="14" height="2" fill="#C8A044"/>
+                        </svg>
+                        <div class="node-name">🤖 指标 Agent</div>
+                        <div class="node-io">RSI/MACD/ROC<br>Stoch/Williams</div>
+                        <div class="core-view-bubble {{ 'has-data' if indicator_view else '' }}">
+                            {{ indicator_view[:48] + ('…' if indicator_view|length > 48 else '') if indicator_view else '暂无核心观点' }}
+                        </div>
+                    </div>
+                    <div class="pipeline-node analyst" title="识别 K 线形态（双底/双顶/突破等）">
+                        <svg class="robot-icon" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-label="形态 agent">
+                            <rect x="8" y="14" width="32" height="24" rx="6" fill="#FFF8E7" stroke="#C8A044" stroke-width="2"/>
+                            <rect x="14" y="6" width="20" height="10" rx="2" fill="#FFF8E7" stroke="#C8A044" stroke-width="2"/>
+                            <line x1="20" y1="6" x2="20" y2="16" stroke="#C8A044" stroke-width="1.5"/>
+                            <line x1="28" y1="6" x2="28" y2="16" stroke="#C8A044" stroke-width="1.5"/>
+                            <circle cx="19" cy="26" r="2" fill="#C0392B"/>
+                            <circle cx="29" cy="26" r="2" fill="#27AE60"/>
+                            <path d="M17 32 Q24 28 31 32" stroke="#C8A044" stroke-width="1.5" fill="none"/>
+                        </svg>
+                        <div class="node-name">🤖 形态 Agent</div>
+                        <div class="node-io">K 线图像<br>形态识别</div>
+                        <div class="core-view-bubble {{ 'has-data' if pattern_view else '' }}">
+                            {{ pattern_view[:48] + ('…' if pattern_view|length > 48 else '') if pattern_view else '暂无核心观点' }}
+                        </div>
+                    </div>
+                    <div class="pipeline-node analyst" title="判断趋势方向与支撑阻力">
+                        <svg class="robot-icon" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-label="趋势 agent">
+                            <rect x="8" y="14" width="32" height="24" rx="6" fill="#FFF8E7" stroke="#C8A044" stroke-width="2"/>
+                            <rect x="14" y="6" width="20" height="10" rx="2" fill="#FFF8E7" stroke="#C8A044" stroke-width="2"/>
+                            <line x1="20" y1="6" x2="20" y2="16" stroke="#C8A044" stroke-width="1.5"/>
+                            <line x1="28" y1="6" x2="28" y2="16" stroke="#C8A044" stroke-width="1.5"/>
+                            <circle cx="19" cy="26" r="2" fill="#4A6FA5"/>
+                            <circle cx="29" cy="26" r="2" fill="#4A6FA5"/>
+                            <path d="M14 33 L24 28 L34 33" stroke="#4A6FA5" stroke-width="1.5" fill="none"/>
+                        </svg>
+                        <div class="node-name">🤖 趋势 Agent</div>
+                        <div class="node-io">趋势线<br>支撑/阻力</div>
+                        <div class="core-view-bubble {{ 'has-data' if trend_view else '' }}">
+                            {{ trend_view[:48] + ('…' if trend_view|length > 48 else '') if trend_view else '暂无核心观点' }}
+                        </div>
+                    </div>
+                    <div class="pipeline-arrow"><i class="fas fa-arrow-right"></i></div>
+
+                    {# 4. Cross-Checker #}
+                    <div class="pipeline-node" title="三 agent 输出交叉校验，输出共识/冲突/核心观点">
+                        <svg class="robot-icon" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-label="交叉校验">
+                            <rect x="8" y="10" width="32" height="28" rx="4" fill="#FFF8E7" stroke="#C8A044" stroke-width="2"/>
+                            <path d="M14 24 L21 31 L34 17" stroke="#2E7D32" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        <div class="node-name">🔍 共识校验</div>
+                        <div class="node-io">consensus_score<br>core_view</div>
+                        <div class="core-view-bubble has-data">
+                            {%- set cv = results.core_view|default('') -%}
+                            {%- if cv -%}
+                                {{ cv[:48] }}{{ '…' if cv|length > 48 else '' }}
+                            {%- else -%}
+                                等待三 agent 输入
+                            {%- endif -%}
+                        </div>
+                    </div>
+                    <div class="pipeline-arrow"><i class="fas fa-arrow-right"></i></div>
+
+                    {# 5. Decision #}
+                    <div class="pipeline-node decision" title="综合所有信息，输出最终交易决策">
+                        <svg class="robot-icon" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-label="决策 agent">
+                            <circle cx="24" cy="24" r="18" fill="#FFF8E7" stroke="#17110A" stroke-width="2"/>
+                            <circle cx="24" cy="24" r="12" fill="none" stroke="#17110A" stroke-width="1.5"/>
+                            <path d="M24 16 L24 24 L30 28" stroke="#C8A044" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+                        </svg>
+                        <div class="node-name">🎯 决策 Agent</div>
+                        <div class="node-io">{{ direction if direction else '暂无决策' }}</div>
+                        <div class="core-view-bubble has-data">
+                            {%- set cv = results.core_view|default('') -%}
+                            {%- if cv -%}
+                                {{ cv[:48] }}{{ '…' if cv|length > 48 else '' }}
+                            {%- else -%}
+                                等待共识
+                            {%- endif -%}
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <!-- Two-column main layout -->
-            <div class="expert-grid">
-
-                <!-- LEFT: process visualization -->
-                <div>
-                    <div class="panel">
-                        <div class="panel-title"><i class="fas fa-stream"></i> 节点时间线</div>
-                        <ol class="timeline" id="process-timeline">
-                            {% for ev in (results.process_events or []) %}
-                            <li class="{{ ev.status }}">
-                                <span class="dot"></span>
-                                <div class="meta">{{ ev.ts }}{% if ev.duration_ms %} · {{ ev.duration_ms }}ms{% endif %}</div>
-                                <div class="node">{{ ev.node }} · {{ ev.status }}</div>
-                                {% if ev.payload %}
-                                <div class="payload">
-                                    {% for k, v in ev.payload.items() %}
-                                        <span style="margin-right:0.6rem;"><strong>{{ k }}:</strong> {{ v }}</span>
-                                    {% endfor %}
-                                </div>
-                                {% endif %}
-                            </li>
-                            {% else %}
-                            <li class="start">
-                                <span class="dot"></span>
-                                <div class="meta">暂无事件</div>
-                                <div class="node">未捕获到节点事件</div>
-                            </li>
-                            {% endfor %}
-                        </ol>
+            {# === Trade params (auto-calc) === #}
+            <div class="trade-params">
+                <div class="trade-param-card entry">
+                    <div class="label">入场价</div>
+                    <div class="value">{{ results.entry_price if results.entry_price else '—' }}</div>
+                    {% if results.trade_params_auto %}<span class="auto-tag">自动</span>{% endif %}
+                </div>
+                <div class="trade-param-card stop">
+                    <div class="label">止损价</div>
+                    <div class="value">{{ results.stop_loss if results.stop_loss else '—' }}</div>
+                    {% if results.trade_params_auto %}<span class="auto-tag">自动</span>{% endif %}
+                </div>
+                <div class="trade-param-card target">
+                    <div class="label">止盈价</div>
+                    <div class="value">{{ results.take_profit if results.take_profit else '—' }}</div>
+                    {% if results.trade_params_auto %}<span class="auto-tag">自动</span>{% endif %}
+                </div>
+                <div class="trade-param-card rr">
+                    <div class="label">风险收益比</div>
+                    <div class="value">
+                        {% if results.risk_reward_ratio is not none %}{{ '%.2f'|format(results.risk_reward_ratio) }}{% else %}—{% endif %}
                     </div>
+                    {% if results.trade_params_auto %}<span class="auto-tag">自动</span>{% endif %}
+                </div>
+            </div>
 
-                    <div class="panel">
-                        <div class="panel-title"><i class="fas fa-project-diagram"></i> 数据传输图</div>
-                        <svg class="data-flow-svg" viewBox="0 0 360 240" xmlns="http://www.w3.org/2000/svg" aria-label="数据流图">
-                            <defs>
-                                <marker id="arrowhead" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
-                                    <polygon points="0 0, 8 4, 0 8" fill="currentColor" />
-                                </marker>
-                            </defs>
-                            <!-- START -->
-                            <rect class="node-box" x="140" y="8" width="80" height="32" rx="6" />
-                            <text class="node-label" x="180" y="24">START</text>
-                            <!-- Analysts -->
-                            <rect class="node-box" x="20"  y="100" width="90" height="32" rx="6" />
-                            <text class="node-label" x="65"  y="116">Indicator</text>
-                            <rect class="node-box" x="135" y="100" width="90" height="32" rx="6" />
-                            <text class="node-label" x="180" y="116">Pattern</text>
-                            <rect class="node-box" x="250" y="100" width="90" height="32" rx="6" />
-                            <text class="node-label" x="295" y="116">Trend</text>
-                            <!-- Cross-Checker -->
-                            <rect class="node-box" x="120" y="170" width="120" height="32" rx="6" />
-                            <text class="node-label" x="180" y="186">Cross-Checker</text>
-                            <!-- Decision -->
-                            <rect class="node-box" x="140" y="212" width="80" height="32" rx="6" />
-                            <text class="node-label" x="180" y="228">Decision</text>
-                            <!-- Arrows -->
-                            <g class="arrow" stroke="currentColor" fill="none">
-                                <path d="M65 100 L65 50 L180 50 L180 40" marker-end="url(#arrowhead)" />
-                                <path d="M180 100 L180 50" marker-end="url(#arrowhead)" />
-                                <path d="M295 100 L295 50 L180 50" marker-end="url(#arrowhead)" />
-                                <path d="M65 132 L65 160 L180 160 L180 170" marker-end="url(#arrowhead)" />
-                                <path d="M180 132 L180 170" marker-end="url(#arrowhead)" />
-                                <path d="M295 132 L295 160 L180 160 L180 170" marker-end="url(#arrowhead)" />
-                                <path d="M180 202 L180 212" marker-end="url(#arrowhead)" />
-                            </g>
-                        </svg>
+            {# === Core-view propagation chain === #}
+            <div class="chain-section">
+                <h2 class="section-title"><i class="fas fa-link"></i> 核心观点传递链</h2>
+                <div class="section-sub">每个智能体基于上一环节的输入，输出自己的"核心观点"，最终汇入决策</div>
+                <div class="chain">
+                    <div class="chain-step">
+                        <div class="step-label">数据输入</div>
+                        <div class="step-name">OHLC 行情</div>
+                        <div class="step-text">{{ results.data_length|default('—') }} 个数据点 · {{ results.timeframe|default('—') }} 周期 · {{ results.asset_name|default('—') }}</div>
                     </div>
-
-                    <div class="panel">
-                        <div class="panel-title"><i class="fas fa-exchange-alt"></i> Agent 交互流</div>
-                        <ul class="agent-flow-list">
-                            <li><strong>START →</strong> 注入 <code>stock_name</code>, <code>time_frame</code>, <code>kline_data</code></li>
-                            <li><strong>Indicator Agent</strong> → 写 <code>indicator_report</code>, <code>rsi</code>, <code>macd</code>, <code>stoch_k/d</code>, <code>roc</code>, <code>willr</code></li>
-                            <li><strong>Pattern Agent</strong> → 写 <code>pattern_report</code>, <code>pattern_chart</code> (base64 PNG)</li>
-                            <li><strong>Trend Agent</strong> → 写 <code>trend_report</code>, <code>trend_chart</code> (base64 PNG)</li>
-                            <li><strong>Cross-Checker</strong> → 写 <code>consensus_score</code>, <code>conflicts</code>, <code>key_points_summary</code>, <code>core_view</code></li>
-                            <li><strong>Decision Maker</strong> → 写 <code>final_trade_decision</code>, <code>decision</code>, <code>entry_price</code>, <code>stop_loss</code>, <code>take_profit</code>, <code>justification</code>, <code>risk_reward_ratio</code>, <code>forecast_horizon</code></li>
-                        </ul>
+                    <div class="chain-step {{ '' if indicator_view else 'empty' }}">
+                        <div class="step-label">指标 Agent</div>
+                        <div class="step-name">🤖 量化方向</div>
+                        <div class="step-text">{{ indicator_view[:60] + '…' if indicator_view and indicator_view|length > 60 else indicator_view if indicator_view else '暂无核心观点' }}</div>
+                    </div>
+                    <div class="chain-step {{ '' if pattern_view else 'empty' }}">
+                        <div class="step-label">形态 Agent</div>
+                        <div class="step-name">🤖 K线形态</div>
+                        <div class="step-text">{{ pattern_view[:60] + '…' if pattern_view and pattern_view|length > 60 else pattern_view if pattern_view else '暂无核心观点' }}</div>
+                    </div>
+                    <div class="chain-step {{ '' if trend_view else 'empty' }}">
+                        <div class="step-label">趋势 Agent</div>
+                        <div class="step-name">🤖 趋势研判</div>
+                        <div class="step-text">{{ trend_view[:60] + '…' if trend_view and trend_view|length > 60 else trend_view if trend_view else '暂无核心观点' }}</div>
+                    </div>
+                    <div class="chain-step">
+                        <div class="step-label">最终决策</div>
+                        <div class="step-name">🎯 交易结论</div>
+                        <div class="step-text">{{ results.core_view|default('暂无') }}</div>
                     </div>
                 </div>
+            </div>
 
-                <!-- RIGHT: financial view -->
-                <div>
-                    <div class="panel">
-                        <div class="panel-title"><i class="fas fa-bullseye"></i> 共识校验（Cross-Checker）</div>
-                        <div class="consensus-card">
-                            <div class="score">{{ ((results.consensus_score|default(0.5)) * 100) | round(1) }}%</div>
-                            <div class="bar"><span style="width: {{ (results.consensus_score|default(0.5) * 100) | round | int }}%;"></span></div>
-                        </div>
-                        <p class="mt-2 mb-1"><strong>冲突点：</strong>{{ results.conflicts|default('无') }}</p>
-                        <p class="mb-1"><strong>共识要点：</strong>{{ results.key_points_summary|default('无') }}</p>
-                        <p class="mb-0"><strong>核心观点：</strong>{{ results.core_view|default('无') }}</p>
-                        {% if results.conflicts %}
-                        <div class="conflict-warn">
-                            <i class="fas fa-exclamation-triangle"></i>
-                            检测到报告分歧，决策应降低权重。
-                        </div>
+            {# === Compact timeline === #}
+            <div class="timeline-section">
+                <h2 class="section-title"><i class="fas fa-stream"></i> 节点时间线</h2>
+                <ol class="timeline" id="process-timeline">
+                    {% for ev in (results.process_events or [])[:10] %}
+                    <li class="{{ ev.status }}">
+                        <span class="dot"></span>
+                        <div class="meta">{{ ev.ts }}{% if ev.duration_ms %} · {{ ev.duration_ms }}ms{% endif %}</div>
+                        <span class="node">{{ ev.node }}</span> · <span style="color:var(--text-muted);">{{ ev.status }}</span>
+                    </li>
+                    {% else %}
+                    <li class="start">
+                        <span class="dot"></span>
+                        <div class="meta">暂无事件</div>
+                        <div class="node">未捕获到节点事件</div>
+                    </li>
+                    {% endfor %}
+                </ol>
+            </div>
+
+            {# === Three agent reports (collapsed) === #}
+            <div class="reports-section">
+                <h2 class="section-title"><i class="fas fa-layer-group"></i> 三智能体分析报告（可展开）</h2>
+                <div class="section-sub">默认折叠 · 点击展开查看完整分析</div>
+
+                <details class="agent-detail">
+                    <summary>
+                        <svg class="robot-mini" viewBox="0 0 26 26" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="7" width="18" height="14" rx="3" fill="#FFF8E7" stroke="#C8A044"/><rect x="8" y="3" width="10" height="6" rx="1" fill="#FFF8E7" stroke="#C8A044"/><circle cx="10" cy="14" r="1.2" fill="#C8A044"/><circle cx="16" cy="14" r="1.2" fill="#C8A044"/></svg>
+                        🤖 指标 Agent · RSI/MACD/ROC/Stoch/Williams
+                        <span class="report-summary">{{ (indicator_view[:60] + '…') if indicator_view and indicator_view|length > 60 else (indicator_view if indicator_view else '暂无报告') }}</span>
+                    </summary>
+                    <div class="body">
+                        {% if results.indicator_report %}
+                        <div class="auto-beautify">{{ results.indicator_report }}</div>
+                        {% else %}
+                        <p class="text-muted mb-0">暂无技术指标报告。</p>
                         {% endif %}
                     </div>
+                </details>
 
-                    <div class="panel">
-                        <div class="panel-title"><i class="fas fa-chart-area"></i> K线 / 形态</div>
+                <details class="agent-detail">
+                    <summary>
+                        <svg class="robot-mini" viewBox="0 0 26 26" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="7" width="18" height="14" rx="3" fill="#FFF8E7" stroke="#C8A044"/><rect x="8" y="3" width="10" height="6" rx="1" fill="#FFF8E7" stroke="#C8A044"/><circle cx="10" cy="14" r="1.2" fill="#C0392B"/><circle cx="16" cy="14" r="1.2" fill="#27AE60"/></svg>
+                        🤖 形态 Agent · K线形态识别
+                        <span class="report-summary">{{ (pattern_view[:60] + '…') if pattern_view and pattern_view|length > 60 else (pattern_view if pattern_view else '暂无报告') }}</span>
+                    </summary>
+                    <div class="body">
                         {% if results.pattern_chart %}
                             <img src="data:image/png;base64,{{ results.pattern_chart }}" alt="K线形态" class="analysis-image">
+                        {% endif %}
+                        {% if results.pattern_report %}
+                        <div class="auto-beautify">{{ results.pattern_report }}</div>
                         {% else %}
-                            <p class="text-muted mb-0">暂无 K 线图</p>
+                        <p class="text-muted mb-0">暂无形态报告。</p>
                         {% endif %}
                     </div>
+                </details>
 
-                    <div class="panel">
-                        <div class="panel-title"><i class="fas fa-exchange-alt"></i> 交易参数</div>
-                        <div class="trade-params-grid">
-                            <div class="trade-param-card entry">
-                                <div class="label">入场价</div>
-                                <div class="value">{{ results.entry_price if results.entry_price else '—' }}</div>
-                            </div>
-                            <div class="trade-param-card stop">
-                                <div class="label">止损价</div>
-                                <div class="value">{{ results.stop_loss if results.stop_loss else '—' }}</div>
-                            </div>
-                            <div class="trade-param-card target">
-                                <div class="label">止盈价</div>
-                                <div class="value">{{ results.take_profit if results.take_profit else '—' }}</div>
-                            </div>
-                            <div class="trade-param-card rr">
-                                <div class="label">风险收益比</div>
-                                <div class="value">
-                                    {% if results.risk_reward_ratio is not none %}
-                                        {{ '%.2f'|format(results.risk_reward_ratio) }}
-                                    {% else %}—{% endif %}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="panel">
-                        <div class="panel-title"><i class="fas fa-chart-pie"></i> 分析概要</div>
-                        <div class="stats-row">
-                            <div class="stats-card">
-                                <div class="stats-number">{{ results.data_length if results.data_length else '—' }}</div>
-                                <div class="stats-label">数据点</div>
-                            </div>
-                            <div class="stats-card">
-                                <div class="stats-number">{{ results.timeframe if results.timeframe else '—' }}</div>
-                                <div class="stats-label">周期</div>
-                            </div>
-                            <div class="stats-card">
-                                <div class="stats-number">{{ results.asset_name if results.asset_name else '—' }}</div>
-                                <div class="stats-label">标的</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="panel">
-                        <div class="panel-title"><i class="fas fa-bullseye"></i> 决策理由</div>
-                        {% if results.justification %}
-                            <div class="auto-beautify">{{ results.justification }}</div>
+                <details class="agent-detail">
+                    <summary>
+                        <svg class="robot-mini" viewBox="0 0 26 26" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="7" width="18" height="14" rx="3" fill="#FFF8E7" stroke="#C8A044"/><rect x="8" y="3" width="10" height="6" rx="1" fill="#FFF8E7" stroke="#C8A044"/><circle cx="10" cy="14" r="1.2" fill="#4A6FA5"/><circle cx="16" cy="14" r="1.2" fill="#4A6FA5"/></svg>
+                        🤖 趋势 Agent · 趋势方向 + 支撑阻力
+                        <span class="report-summary">{{ (trend_view[:60] + '…') if trend_view and trend_view|length > 60 else (trend_view if trend_view else '暂无报告') }}</span>
+                    </summary>
+                    <div class="body">
+                        {% if results.trend_chart %}
+                            <img src="data:image/png;base64,{{ results.trend_chart }}" alt="趋势分析" class="analysis-image">
+                        {% endif %}
+                        {% if results.trend_report %}
+                        <div class="auto-beautify">{{ results.trend_report }}</div>
                         {% else %}
-                            <p class="text-muted mb-0">暂无结构化理由，请参考下方三份分析报告。</p>
+                        <p class="text-muted mb-0">暂无趋势报告。</p>
                         {% endif %}
                     </div>
-
-                    <div class="panel">
-                        <div class="panel-title"><i class="fas fa-layer-group"></i> 三 agent 报告（可展开）</div>
-                        <details class="agent-detail" open>
-                            <summary><i class="fas fa-chart-bar"></i> 技术指标</summary>
-                            <div class="body">
-                                {% if results.indicator_report %}
-                                <div class="auto-beautify">{{ results.indicator_report }}</div>
-                                {% else %}
-                                <p class="text-muted mb-0">暂无技术指标报告。</p>
-                                {% endif %}
-                            </div>
-                        </details>
-                        <details class="agent-detail">
-                            <summary><i class="fas fa-search"></i> 形态分析</summary>
-                            <div class="body">
-                                {% if results.pattern_report %}
-                                <div class="auto-beautify">{{ results.pattern_report }}</div>
-                                {% else %}
-                                <p class="text-muted mb-0">暂无形态报告。</p>
-                                {% endif %}
-                            </div>
-                        </details>
-                        <details class="agent-detail">
-                            <summary><i class="fas fa-analytics"></i> 趋势分析</summary>
-                            <div class="body">
-                                {% if results.trend_chart %}
-                                    <img src="data:image/png;base64,{{ results.trend_chart }}" alt="趋势分析" class="analysis-image mb-3">
-                                {% endif %}
-                                {% if results.trend_report %}
-                                <div class="auto-beautify">{{ results.trend_report }}</div>
-                                {% else %}
-                                <p class="text-muted mb-0">暂无趋势报告。</p>
-                                {% endif %}
-                            </div>
-                        </details>
-                    </div>
-                </div>
+                </details>
             </div>
 
-            <div class="back-row mt-3">
+            {# === Full report CTA === #}
+            <div class="full-report-cta">
+                <h3><i class="fas fa-file-alt"></i> 需要查看完整分析报告？</h3>
+                <p>包含三份完整报告全文、决策理由、共识校验、K 线图、趋势图，所有字段一览</p>
+                <a id="full-report-link-2" href="/output?view=full" class="btn-primary-cta">
+                    <i class="fas fa-arrow-right"></i> 跳转完整分析报告
+                </a>
+            </div>
+
+            <div class="back-row">
                 <a href="/" class="back-link"><i class="fas fa-arrow-left"></i> 返回首页</a>
             </div>
         </div>
@@ -660,6 +915,20 @@
                         btn.innerHTML = original;
                     });
             });
+
+            // Update the "full report" link with the current results key so
+            // it goes straight to the cached results without re-running.
+            try {
+                const cachedRaw = sessionStorage.getItem('lastResultsKey');
+                const key = cachedRaw && JSON.parse(cachedRaw);
+                if (key) {
+                    document.querySelectorAll('a[id^="full-report-link"]').forEach(function (a) {
+                        a.href = '/output?key=' + encodeURIComponent(key) + '&view=full';
+                    });
+                }
+            } catch (e) {
+                // ignore — links fall back to ?view=full with no key
+            }
         })();
     </script>
 </body>
